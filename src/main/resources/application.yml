@@ -1,0 +1,162 @@
+spring:
+  application:
+    name: compliance-checker
+
+  # Database Configuration (PostgreSQL + PGVector)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/compliance_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # SQL Configuration
+  sql:
+    init:
+      mode: always
+      platform: postgresql
+
+  # Flyway Database Migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: true
+
+  # Thymeleaf Configuration
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+
+  # File Upload Configuration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+      file-size-threshold: 2KB
+
+  # Security (Basic for local, will be Azure AD for cloud)
+  security:
+    user:
+      name: admin
+      password: admin123
+
+  # Caching Configuration
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=1h
+    cache-names:
+      - regulatory-metadata
+      - law-names
+
+# Server Configuration
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,application/javascript,application/json
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.insurance.compliance: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.springframework.jdbc.core: DEBUG
+    dev.langchain4j: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ./logs/application.log
+    max-size: 10MB
+    max-history: 30
+
+# Custom Application Configuration
+compliance:
+  # Ollama Configuration
+  ollama:
+    base-url: http://localhost:11434
+    chat-model: llama3.2:1b
+    embedding-model: bge-m3
+    timeout: 120s
+    max-retries: 3
+
+  # RAG Configuration
+  rag:
+    chunk-size: 1000
+    chunk-overlap: 200
+    top-k-results: 5
+    similarity-threshold: 0.7
+    max-policy-sections: 50
+
+  # PDF Processing
+  pdf:
+    max-file-size-mb: 10
+    allowed-mime-types: application/pdf
+    section-detection:
+      enabled: true
+      heading-patterns: "^(Art\\.|§|Article|Section|Chapter|Artikel)"
+
+  # Audit Logging
+  audit:
+    enabled: true
+    destination: file  # Options: file, azure-blob
+    local-path: ./logs/audit
+    log-format: json
+
+  # Regulatory Data Sources
+  regulatory:
+    data-path: ./data/regulatory
+    languages:
+      - de
+      - fr
+      - it
+      - en
+    sources:
+      - name: FINMA
+        enabled: true
+      - name: Solvency II
+        enabled: true
+      - name: Solvency UK
+        enabled: true
+
+  # Processing Configuration
+  processing:
+    async: true
+    thread-pool-size: 5
+    queue-capacity: 100
+    sse-timeout: 300s
+
+  # Security Configuration (Local)
+  security:
+    auth-type: basic  # Options: basic, azure-ad
+    allowed-origins: http://localhost:8080
+
+# Management Endpoints (Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
