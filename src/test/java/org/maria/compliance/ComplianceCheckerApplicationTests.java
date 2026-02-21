@@ -1,4 +1,4 @@
-package org.maria.compliance_checker;
+package org.maria.compliance;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compliance Checker - Home</title>
+    <link th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .main-container {
+            margin-top: 2rem;
+        }
+        .upload-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            padding: 2rem;
+        }
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 3rem;
+            text-align: center;
+            background-color: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-zone:hover {
+            background-color: #e8ebff;
+            border-color: #764ba2;
+        }
+        .upload-zone.dragover {
+            background-color: #d0d5ff;
+            border-color: #667eea;
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation Bar -->
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                🏛️ Regulatory Compliance Checker
+            </span>
+        <div class="d-flex align-items-center">
+                <span class="text-white me-3">
+                    Welcome, <strong sec:authentication="name">User</strong>
+                </span>
+            <form th:action="@{/logout}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container main-container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="upload-card">
+                <h2 class="mb-4">Upload Policy Document</h2>
+                <p class="text-muted">
+                    Upload your insurance policy PDF (max 10 MB) to check compliance
+                    against FINMA, Solvency II, and Solvency UK regulations.
+                </p>
+
+                <!-- Upload Form (will be enhanced with drag-drop and SSE later) -->
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon mb-3">
+                            <svg width="64" height="64" fill="#667eea" viewBox="0 0 16 16">
+                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                            </svg>
+                        </div>
+                        <h5>Drag & Drop your PDF here</h5>
+                        <p class="text-muted mb-3">or</p>
+                        <input type="file" id="fileInput" name="file" accept="application/pdf"
+                               style="display: none;" required>
+                        <button type="button" class="btn btn-primary"
+                                onclick="document.getElementById('fileInput').click()">
+                            Browse Files
+                        </button>
+                        <p class="text-muted mt-3 small">Maximum file size: 10 MB</p>
+                    </div>
+
+                    <div id="fileName" class="mt-3 text-center" style="display: none;">
+                        <strong>Selected file:</strong> <span id="fileNameText"></span>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
+                            Analyze Document
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Info Card -->
+            <div class="card mt-4 border-0 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">How it works</h5>
+                    <ol>
+                        <li>Upload your insurance policy PDF document</li>
+                        <li>Our AI system analyzes it against regulatory requirements</li>
+                        <li>Receive detailed compliance violations with exact regulatory citations</li>
+                        <li>Review results and take corrective actions</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<script>
+    // Basic file input handling (will be enhanced with SSE later)
+    const fileInput = document.getElementById('fileInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const submitBtn = document.getElementById('submitBtn');
+    const fileName = document.getElementById('fileName');
+    const fileNameText = document.getElementById('fileNameText');
+
+    fileInput.addEventListener('change', function(e) {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            const maxSize = 10 * 1024 * 1024; // 10 MB
+
+            if (file.size > maxSize) {
+                alert('File size exceeds 10 MB limit!');
+                this.value = '';
+                submitBtn.disabled = true;
+                fileName.style.display = 'none';
+                return;
+            }
+
+            fileNameText.textContent = file.name;
+            fileName.style.display = 'block';
+            submitBtn.disabled = false;
+        }
+    });
+
+    // Drag and drop handlers
+    uploadZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', function(e) {
+        this.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // Form submission (placeholder - will be replaced with SSE)
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        alert('Upload functionality will be implemented in the next step!');
+    });
+</script>
+</body>
+</html>
