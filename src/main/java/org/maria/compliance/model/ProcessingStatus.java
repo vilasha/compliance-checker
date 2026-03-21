@@ -1,5 +1,5 @@
 package org.maria.compliance.model;
 
 public enum ProcessingStatus {
-    SUCCESS, FAILURE, VALIDATION_ERROR
+    UPLOADING, PROCESSING, COMPLETED, FAILED, VALIDATION_ERROR
 }
