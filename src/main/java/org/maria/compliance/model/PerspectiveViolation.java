@@ -6,7 +6,7 @@ import lombok.Builder;
  * Violation identified from one perspective
  */
 @Builder
-public record PerspectiveViolation(String perspective,         // Which perspective found this
+public record PerspectiveViolation(Perspective perspective,
                                    Severity severity,
                                    String regulatoryText,      // Exact quoted text from regulation
                                    String violationDetail,     // What's wrong
