@@ -57,6 +57,7 @@ spring:
     cache-names:
       - regulatory-metadata
       - law-names
+      - query-variants
 
 # Server Configuration
 server:
@@ -95,13 +96,53 @@ compliance:
     timeout: 120s
     max-retries: 3
 
-  # RAG Configuration
+  # RAG Configuration with Multi-Query Enhancement
   rag:
     chunk-size: 1000
     chunk-overlap: 200
     top-k-results: 5
     similarity-threshold: 0.7
     max-policy-sections: 50
+
+    # Multi-Query Retrieval with Perspective Synthesis
+    multi-query:
+      enabled: true
+      query-variants: 5  # Number of different perspectives to generate
+      perspectives:
+        - name: strict_legal
+          description: "Literal interpretation focusing on exact regulatory language"
+          weight: 1.5
+        - name: industry_standard
+          description: "How the regulation is typically understood in practice"
+          weight: 1.2
+        - name: edge_cases
+          description: "Boundary conditions and special circumstances"
+          weight: 1.0
+        - name: cross_regulatory
+          description: "Related regulations from other frameworks (FINMA, Solvency UK)"
+          weight: 1.1
+        - name: risk_based
+          description: "Focus on underlying risk principles"
+          weight: 1.3
+
+      aggregation:
+        deduplication-threshold: 0.9  # Cosine similarity threshold for deduplication
+        max-chunks-per-variant: 5     # Max regulatory chunks per query variant
+        total-max-chunks: 15           # Max total chunks after aggregation
+        parallel-retrieval: true       # Execute variant retrievals in parallel
+
+      # Query generation prompt template
+      query-generation-prompt: |
+        Given this policy text, generate {count} different analytical queries from these perspectives:
+        {perspectives}
+        
+        Policy text: {policyText}
+        
+        Return only the queries as a JSON array with format:
+        [
+          {"perspective": "strict_legal", "query": "..."},
+          {"perspective": "industry_standard", "query": "..."}
+        ]
 
   # PDF Processing
   pdf:
