@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/compliance_db
+    username: postgres
+    password: postgres
+
+logging:
+  level:
+    root: INFO
+    org.maria.compliance: DEBUG
+    org.springframework.jdbc.core: INFO
+    org.flywaydb: INFO
+
+compliance:
+  ollama:
+    base-url: http://localhost:11434
+
+  audit:
+    destination: file
+    local-path: ./logs/train/audit
+
+  regulatory:
+    data-path: ./data/train/regulatory
+
+  rag:
+    multi-query:
+      enabled: true
+      query-variants: 3

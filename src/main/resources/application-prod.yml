@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/compliance_db
+    username: postgres
+    password: postgres  # In prod, use Azure Key Vault
+
+logging:
+  level:
+    root: WARN
+    org.maria.compliance: INFO
+    org.springframework.jdbc.core: WARN
+    org.flywaydb: INFO
+    com.zaxxer.hikari: WARN
+
+compliance:
+  ollama:
+    base-url: http://localhost:11434
+
+  audit:
+    destination: azure-blob
+    local-path: ./logs/prod/audit
+
+  regulatory:
+    data-path: ./data/prod/regulatory
+
+  rag:
+    multi-query:
+      enabled: true
+      query-variants: 5
+
+  processing:
+    thread-pool-size: 10
+    queue-capacity: 200

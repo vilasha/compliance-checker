@@ -1,4 +1,4 @@
-package com.insurance.compliance.config;
+package org.maria.compliance.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

@@ -107,19 +107,6 @@ You should see JSON response with your models listed.
 
 ---
 
-## Step 5: Update Spring Boot Application
-
-Now that the database is running, remove the database exclusion:
-
-**Open:** `src/main/java/com/insurance/compliance/ComplianceCheckerApplication.java`
-
-**Change FROM:**
-```java
-@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
-```
-
----
-
 ## Useful Docker Commands
 
 **View logs:**
