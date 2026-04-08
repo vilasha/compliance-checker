@@ -73,7 +73,7 @@ server:
 logging:
   level:
     root: INFO
-    com.insurance.compliance: DEBUG
+    com.maria.compliance: DEBUG
     org.springframework.web: INFO
     org.springframework.security: INFO
     org.springframework.jdbc.core: DEBUG

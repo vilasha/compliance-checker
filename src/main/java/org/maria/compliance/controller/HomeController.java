@@ -1,4 +1,4 @@
-package com.insurance.compliance.controller;
+package org.maria.compliance.controller;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
