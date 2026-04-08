@@ -2,32 +2,6 @@ spring:
   application:
     name: compliance-checker
 
-  # Database Configuration (PostgreSQL + PGVector)
-  datasource:
-    url: jdbc:postgresql://localhost:5432/compliance_db
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-
-  # SQL Configuration
-  sql:
-    init:
-      mode: always
-      platform: postgresql
-
-  # Flyway Database Migrations
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    validate-on-migrate: true
-
   # Thymeleaf Configuration
   thymeleaf:
     cache: false
