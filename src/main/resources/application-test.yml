@@ -1,0 +1,20 @@
+spring:
+  main:
+    banner-mode: off
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+logging:
+  level:
+    root: WARN
+    org.maria.compliance: INFO
+
+compliance:
+  pdf:
+    section-detection:
+      enabled: true
+      heading-patterns: "^(Art\\.|§|Article|Section|Chapter|Artikel)"
+  rag:
+    chunk-size: 1000
+    chunk-overlap: 200
