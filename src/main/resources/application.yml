@@ -70,6 +70,12 @@ compliance:
     timeout: 120s
     max-retries: 3
 
+  # Embedding Store (PgVectorEmbeddingStore via LangChain4j)
+  embedding-store:
+    table: regulatory_embeddings
+    dimension: 1024
+    index-list-size: 100
+
   # RAG Configuration with Multi-Query Enhancement
   rag:
     chunk-size: 1000
