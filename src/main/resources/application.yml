@@ -65,7 +65,7 @@ compliance:
   # Ollama Configuration
   ollama:
     base-url: http://localhost:11434
-    chat-model: llama3.2:1b
+    chat-model: llama3.1:8b
     embedding-model: bge-m3
     timeout: 120s
     max-retries: 3

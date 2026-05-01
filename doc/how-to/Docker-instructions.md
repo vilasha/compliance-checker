@@ -35,9 +35,9 @@ Once containers are running, you need to download the models.
 
 ### Option A: Using Docker Exec (Recommended)
 
-**Pull llama3.2:1b (Chat Model):**
+**Pull llama3.1:8b (Chat Model):**
 ```bash
-docker exec compliance-ollama ollama pull llama3.2:1b
+docker exec compliance-ollama ollama pull llama3.1:8b
 ```
 
 **Pull bge-m3 (Embedding Model):**
@@ -46,7 +46,7 @@ docker exec compliance-ollama ollama pull bge-m3
 ```
 
 **Wait for downloads to complete.** The models are:
-- llama3.2:1b: ~1.3 GB
+- llama3.1:8b: ~4.7 GB
 - bge-m3: ~2.4 GB
 
 **Verify models are installed:**
@@ -57,7 +57,7 @@ docker exec compliance-ollama ollama list
 Expected output:
 ```
 NAME              ID              SIZE    MODIFIED
-llama3.2:1b       abc123def456    1.3 GB  5 minutes ago
+llama3.1:8b       abc123def456    4.7 GB  5 minutes ago
 bge-m3            xyz789uvw012    2.4 GB  3 minutes ago
 ```
 
@@ -65,7 +65,7 @@ bge-m3            xyz789uvw012    2.4 GB  3 minutes ago
 
 ```bash
 docker exec -it compliance-ollama /bin/sh
-ollama pull llama3.2:1b
+ollama pull llama3.1:8b
 ollama pull bge-m3
 exit
 ```
@@ -146,7 +146,7 @@ docker-compose logs postgres
 ### Ollama models download slowly
 ```bash
 # This is normal - models are large
-# llama3.2:1b: ~1.3 GB
+# llama3.1:8b: ~4.7 GB
 # bge-m3: ~2.4 GB
 # Be patient, downloads can take 10-20 minutes depending on connection
 ```

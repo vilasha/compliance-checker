@@ -15,15 +15,15 @@ if %errorlevel% neq 0 (
 echo OK: Ollama container is running.
 echo.
 
-echo Step 2: Pulling llama3.2:1b (Chat Model - ~1.3 GB)...
-echo This may take 5-15 minutes depending on your internet speed...
-docker exec compliance-ollama ollama pull llama3.2:1b
+echo Step 2: Pulling llama3.1:8b (Chat Model - ~4.7 GB)...
+echo This may take 10-30 minutes depending on your internet speed...
+docker exec compliance-ollama ollama pull llama3.1:8b
 if %errorlevel% neq 0 (
-    echo ERROR: Failed to pull llama3.2:1b
+    echo ERROR: Failed to pull llama3.1:8b
     pause
     exit /b 1
 )
-echo OK: llama3.2:1b downloaded successfully.
+echo OK: llama3.1:8b downloaded successfully.
 echo.
 
 echo Step 3: Pulling bge-m3 (Embedding Model - ~2.4 GB)...
