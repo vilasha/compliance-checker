@@ -33,7 +33,7 @@ Insurance and reinsurance companies must ensure their policy documents comply wi
    - Show progress via **Server‑Sent Events (SSE)** and display results in a pop‑up.
 
 3. **LLM Strategy**  
-   - Base model: **`llama3.2:1b`** (lightweight, multilingual).  
+   - Base model: **`llama3.1:8b`** (lightweight, multilingual).  
    - Fine‑tune on the **`rcds/swiss_rulings`** dataset to improve legal reasoning in German/French/Italian.  
    - Serve via **Ollama** on a low‑cost Azure VM.
 
@@ -62,7 +62,7 @@ We will build a **Retrieval-Augmented Generation (RAG)** system using **Java 21/
                         │                 │────▶┌─────────────────┐
                         │                 │     │   Ollama        │
                         │                 │────▶│ (fine‑tuned     │
-                        └─────────────────┘     │  llama3.2:1b    │
+                        └─────────────────┘     │  llama3.1:8b    │
                               │   │             │  & bge-m3)       │
                               │   └──────────────────┐            │
                               ▼                      ▼            │
@@ -91,10 +91,10 @@ We will build a **Retrieval-Augmented Generation (RAG)** system using **Java 21/
    - **Vector Store**: PGVector with cosine similarity search.
    - **Retrieval**: For each policy chunk, fetch top‑k (e.g., k=5) regulatory chunks.
    - **Prompt Construction**: Combine policy chunk + retrieved regulatory texts. Prompt engineered for violation detection and exact quoting.
-   - **LLM Call**: Send to Ollama’s fine‑tuned `llama3.2:1b` model.
+   - **LLM Call**: Send to Ollama’s fine‑tuned `llama3.1:8b` model.
 
 #### 4. **LLM Serving (Ollama)**
-   - Base model: `llama3.2:1b`.
+   - Base model: `llama3.1:8b`.
    - Fine‑tuned using **LoRA** on the `rcds/swiss_rulings` dataset to enhance legal reasoning in German, French, and Italian.
    - Custom Ollama `Modelfile` that imports the base model and fine‑tuned adapter weights.
    - Embedding model `bge-m3` runs in the same Ollama instance.
@@ -159,7 +159,7 @@ We will build a **Retrieval-Augmented Generation (RAG)** system using **Java 21/
 #### 12. **Local Development Environment**
    - Docker Compose with:
      - `ankane/pgvector` (PostgreSQL + PGVector)
-     - `ollama/ollama` (pre‑pull `llama3.2:1b`, `bge-m3`, and fine‑tuned model)
+     - `ollama/ollama` (pre‑pull `llama3.1:8b`, `bge-m3`, and fine‑tuned model)
    - Spring Boot with profile `local` reads `application-local.yml`.
    - Audit logs written to `./logs/audit`.
    - All services accessible on `localhost`.
@@ -178,7 +178,7 @@ We will build a **Retrieval-Augmented Generation (RAG)** system using **Java 21/
   - Export LoRA adapter weights.
   - Create a `Modelfile`:
     ```
-    FROM llama3.2:1b
+    FROM llama3.1:8b
     ADAPTER /path/to/lora-adapter.gguf
     TEMPLATE "{{ .Prompt }}"
     ```
@@ -223,7 +223,7 @@ We will build a **Retrieval-Augmented Generation (RAG)** system using **Java 21/
 | RAG framework       | LangChain4j                                                              |
 | Vector DB           | PostgreSQL + PGVector                                                    |
 | Embedding model     | **`bge-m3`** served by Ollama (multilingual)                             |
-| LLM                 | llama3.2:1b fine‑tuned on rcds/swiss_rulings, served by Ollama           |
+| LLM                 | llama3.1:8b fine‑tuned on rcds/swiss_rulings, served by Ollama           |
 | Authentication      | Azure AD (OAuth2)                                                        |
 | Secrets             | Azure Key Vault (cloud) / local YML (local)                              |
 | Audit logging       | Logback custom appender → local file or Azure Blob cold tier             |
