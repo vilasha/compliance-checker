@@ -55,7 +55,7 @@ Policy Section (text)
 └───────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────┐
-│  LLM Analysis (Fine-tuned llama3.2:8b)│
+│  LLM Analysis (Fine-tuned llama3.1:8b)│
 │  - Considers multiple perspectives    │
 │  - Produces nuanced violation report  │
 │  - Cites exact regulatory text        │
