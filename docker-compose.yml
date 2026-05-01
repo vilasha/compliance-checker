@@ -1,54 +1,115 @@
 services:
-  # PostgreSQL with PGVector extension
+
+  # ---- PostgreSQL with PGVector ----
   postgres:
     image: pgvector/pgvector:pg16
     container_name: compliance-postgres
     environment:
-      POSTGRES_DB: compliance_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
+    restart: unless-stopped
     networks:
       - compliance-network
 
-  # Ollama for LLM and embeddings
+  # ---- Ollama (LLM + Embeddings server) ----
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.22.0
     container_name: compliance-ollama
     ports:
-      - "11434:11434"
+      - "${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEMORY_LIMIT:-10g}
+    restart: unless-stopped
     networks:
       - compliance-network
-    # For GPU support (optional, only if you have NVIDIA GPU):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+
+  # ---- Model puller (runs once, then exits) ----
+  # Pulls required models on first startup. Re-running is a no-op
+  # because Ollama skips already-downloaded models.
+  ollama-pull:
+    image: ollama/ollama:0.22.0
+    container_name: compliance-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Pulling ${OLLAMA_CHAT_MODEL:-llama3.1:8b}..."
+        ollama pull ${OLLAMA_CHAT_MODEL:-llama3.1:8b}
+        echo "Pulling ${OLLAMA_EMBEDDING_MODEL:-bge-m3}..."
+        ollama pull ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
+        echo "All models ready."
+    restart: "no"
+    networks:
+      - compliance-network
+
+  # ---- Spring Boot app (opt-in via --profile full) ----
+  # For local development, run the app from your IDE instead.
+  # Usage: docker compose --profile full up
+  app:
+    build: .
+    container_name: compliance-app
+    profiles: ["full"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      COMPLIANCE_OLLAMA_BASE_URL: http://ollama:11434
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    volumes:
+      - ./data/regulatory:/app/data/regulatory:ro
+      - app_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    restart: unless-stopped
+    networks:
+      - compliance-network
 
 volumes:
   postgres_data:
     driver: local
   ollama_data:
+    driver: local
+  app_logs:
     driver: local
 
 networks:

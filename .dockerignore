@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+
+# IDE
+.idea/
+*.iml
+*.iws
+.project
+.classpath
+.settings/
+
+# Git
+.git/
+.gitignore
+
+# Docker (don't send compose into the build context)
+docker-compose.yml
+.env
+
+# Documentation and infrastructure scripts
+doc/
+infra/
+*.md
+LICENSE
+
+# Logs and data
+logs/
+data/
+
+# OS
+.DS_Store
+Thumbs.db

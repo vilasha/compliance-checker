@@ -32,3 +32,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Docker ###
+.env
+
+### Data (regulatory PDFs - keep directory structure only) ###
+data/regulatory/*
+!data/regulatory/.gitkeep
