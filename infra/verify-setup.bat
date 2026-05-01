@@ -4,46 +4,64 @@ echo Compliance Checker - Environment Check
 echo ========================================
 echo.
 
-echo Checking Docker containers...
-echo.
-docker-compose ps
-echo.
+set PASS=0
+set FAIL=0
 
-echo ========================================
-echo Testing PostgreSQL connection...
-echo ========================================
-docker exec compliance-postgres psql -U postgres -d compliance_db -c "SELECT version();"
-if %errorlevel% neq 0 (
-    echo ERROR: Cannot connect to PostgreSQL
-    pause
-    exit /b 1
+echo Docker containers:
+docker ps | findstr compliance-postgres >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   OK: PostgreSQL running
+    set /a PASS+=1
+) else (
+    echo   FAIL: PostgreSQL not running
+    set /a FAIL+=1
+)
+
+docker ps | findstr compliance-ollama >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   OK: Ollama running
+    set /a PASS+=1
+) else (
+    echo   FAIL: Ollama not running
+    set /a FAIL+=1
 )
 echo.
 
-echo ========================================
-echo Checking PGVector extension...
-echo ========================================
-docker exec compliance-postgres psql -U postgres -d compliance_db -c "SELECT * FROM pg_available_extensions WHERE name = 'vector';"
+echo PostgreSQL:
+docker exec compliance-postgres pg_isready -U postgres >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   OK: Connection healthy
+    set /a PASS+=1
+) else (
+    echo   FAIL: Cannot connect
+    set /a FAIL+=1
+)
 echo.
 
-echo ========================================
-echo Testing Ollama API...
-echo ========================================
-curl -s http://localhost:11434/api/tags
-echo.
+echo Ollama:
+docker exec compliance-ollama ollama list >nul 2>&1
+if %errorlevel% equ 0 (
+    echo   OK: API responding
+    set /a PASS+=1
+) else (
+    echo   FAIL: API not responding
+    set /a FAIL+=1
+)
 echo.
 
-echo ========================================
-echo Listing installed Ollama models...
-echo ========================================
+echo Installed models:
 docker exec compliance-ollama ollama list
 echo.
 
 echo ========================================
-echo Environment Check Complete!
+echo Results: %PASS% passed, %FAIL% failed
 echo ========================================
 echo.
-echo If you see models listed above, you're ready to run the application.
-echo If not, run: setup-ollama-models.bat
-echo.
+
+if %FAIL% gtr 0 (
+    echo Some checks failed. Run these commands to fix:
+    echo   docker compose up -d
+    echo   infra\setup-ollama-models.bat
+)
+
 pause
