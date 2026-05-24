@@ -172,4 +172,48 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
                 file.getOriginalFilename(), sections.size(), allChunks.size());
         return allChunks;
     }
+
+    @Override
+    public String extractText(byte[] pdfContent, String fileName) {
+        try (PDDocument document = Loader.loadPDF(pdfContent)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            String text = stripper.getText(document);
+            log.debug("Extracted {} characters from PDF: {}", text.length(), fileName);
+            return text;
+        } catch (IOException e) {
+            log.error("Failed to extract text from PDF: {}", fileName, e);
+            throw new PdfProcessingException("Failed to extract text from PDF: " + fileName, e);
+        }
+    }
+
+    @Override
+    public List<ChunkResult> processAndChunk(byte[] pdfContent, String fileName) {
+        String text = extractText(pdfContent, fileName);
+        List<PolicySection> sections = detectSections(text);
+
+        List<ChunkResult> allChunks = new ArrayList<>();
+
+        for (PolicySection section : sections) {
+            List<ChunkResult> sectionChunks = chunkText(
+                    section.content(),
+                    defaultChunkSize,
+                    defaultChunkOverlap
+            );
+
+            sectionChunks = sectionChunks.stream()
+                    .map(chunk -> ChunkResult.builder()
+                            .text(chunk.text())
+                            .chunkIndex(allChunks.size())
+                            .sectionHeading(section.heading())
+                            .startPosition(chunk.startPosition())
+                            .endPosition(chunk.endPosition())
+                            .build())
+                    .toList();
+
+            allChunks.addAll(sectionChunks);
+        }
+
+        log.info("Processed PDF '{}': {} sections, {} chunks", fileName, sections.size(), allChunks.size());
+        return allChunks;
+    }
 }

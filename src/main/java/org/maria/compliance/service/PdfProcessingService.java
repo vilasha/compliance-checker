@@ -10,10 +10,14 @@ public interface PdfProcessingService {
 
     String extractText(MultipartFile file);
 
+    String extractText(byte[] pdfContent, String fileName);
+
     List<PolicySection> detectSections(String text);
 
     List<ChunkResult> chunkText(String text, int chunkSize, int overlap);
 
     List<ChunkResult> processAndChunk(MultipartFile file);
+
+    List<ChunkResult> processAndChunk(byte[] pdfContent, String fileName);
 
 }
