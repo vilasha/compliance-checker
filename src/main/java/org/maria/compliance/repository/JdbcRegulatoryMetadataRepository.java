@@ -34,6 +34,17 @@ public class JdbcRegulatoryMetadataRepository implements RegulatoryMetadataRepos
     }
 
     @Override
+    public boolean existsBySourceUrl(String sourceUrl) {
+        Long count = jdbcClient.sql(
+                        "SELECT COUNT(*) FROM " + tableName +
+                                " WHERE metadata->>'source_url' = :sourceUrl")
+                .param("sourceUrl", sourceUrl)
+                .query(Long.class)
+                .single();
+        return count != null && count > 0;
+    }
+
+    @Override
     public List<RegulatoryMetadata> findAll() {
         return jdbcClient.sql("""
                         SELECT metadata->>'law_name' AS law_name,

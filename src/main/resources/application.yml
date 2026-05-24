@@ -46,12 +46,38 @@ server:
 # Logging Configuration
 logging:
   level:
-    root: INFO
-    com.maria.compliance: DEBUG
-    org.springframework.web: INFO
-    org.springframework.security: INFO
-    org.springframework.jdbc.core: DEBUG
-    dev.langchain4j: DEBUG
+    root: WARN
+    org.maria.compliance: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.springframework.jdbc.core: WARN
+    dev.langchain4j: INFO
+    # HtmlUnit (JS errors, CSS parsing, SSL certs)
+    org.htmlunit: ERROR
+    org.htmlunit.javascript: OFF
+    org.htmlunit.css: OFF
+    org.htmlunit.cyberneko: OFF
+    org.htmlunit.WebClient: ERROR
+    # Apache HttpClient (wire/header dumps)
+    org.apache.http: ERROR
+    org.apache.hc: ERROR
+    # PDFBox (font metrics, space widths)
+    org.apache.pdfbox: WARN
+    org.apache.fontbox: WARN
+    # HikariCP (pool stats, connection lifecycle)
+    com.zaxxer.hikari: WARN
+    # PostgreSQL driver (TLS handshakes, certs)
+    org.postgresql: WARN
+    # Java SSL/TLS certificate logging
+    jdk.event.security: OFF
+    javax.net.ssl: WARN
+    sun.security.ssl: WARN
+    # Flyway
+    org.flywaydb: INFO
+    # Spring internals (bean creation, autowiring)
+    org.springframework.beans: WARN
+    org.springframework.context: WARN
+    org.springframework.boot: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -154,6 +180,22 @@ compliance:
         enabled: true
       - name: Solvency UK
         enabled: true
+
+  # FINMA Scraper (activated with --spring.profiles.active=dev,scrape)
+  # GUIDs are Sitecore item IDs for document type categories.
+  # Stable unless FINMA restructures their CMS. To verify or find new GUIDs:
+  # DevTools → Network → XHR → select a filter → check --data-raw for the Dokumentenart value.
+  scraper:
+    finma:
+      url: https://www.finma.ch/de/dokumente/
+      api: https://www.finma.ch/api/search/getresult
+      language: de
+      page-size: 10
+      max-pages: 50
+      guid:
+        datasource: "{E02680B6-2600-4C66-BD5B-57BF955A97A8}"
+        wegleitung: "{56463C7B-3281-4E93-B515-EC580594A196}"
+        aufsichtsmitteilung: "{1C2D29B9-E600-4344-9170-786463D19135}"
 
   # Processing Configuration
   processing:

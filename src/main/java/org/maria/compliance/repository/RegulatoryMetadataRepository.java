@@ -8,6 +8,8 @@ public interface RegulatoryMetadataRepository {
 
     long countByLawNameAndYear(String lawName, int year);
 
+    boolean existsBySourceUrl(String sourceUrl);
+
     List<RegulatoryMetadata> findAll();
 
     int deleteByLawNameAndYear(String lawName, int year);
