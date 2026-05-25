@@ -11,7 +11,7 @@ import java.util.Map;
  * Implements enhanced retrieval strategy with multiple query perspectives
  * and result synthesis for richer compliance analysis.
  * <p>
- * This is a design outline - full implementation comes in Step 9.
+ * This is a design outline - full implementation comes in Step 6
  */
 public interface MultiQueryRagService {
 
