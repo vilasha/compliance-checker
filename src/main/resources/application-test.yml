@@ -11,6 +11,8 @@ logging:
     org.maria.compliance: INFO
 
 compliance:
+  ollama:
+    chat-model: llama3.1:8b
   pdf:
     section-detection:
       enabled: true
@@ -18,3 +20,6 @@ compliance:
   rag:
     chunk-size: 1000
     chunk-overlap: 200
+    top-k-results: 5
+    similarity-threshold: 0.7
+    parse-retry-max: 4

@@ -109,6 +109,7 @@ compliance:
     top-k-results: 5
     similarity-threshold: 0.7
     max-policy-sections: 50
+    parse-retry-max: 4 # Total LLM calls per analysis = 1 + parse-retry-max
 
     # Multi-Query Retrieval with Perspective Synthesis
     multi-query:

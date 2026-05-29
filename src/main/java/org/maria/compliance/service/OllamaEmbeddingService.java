@@ -74,7 +74,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
     }
 
     @Override
-    public EmbeddingSearchResult searchSimilar(String queryText, int maxResults, double minScore) {
+    public EmbeddingSearchResult<TextSegment> searchSimilar(String queryText, int maxResults, double minScore) {
         Embedding queryEmbedding = embedText(queryText);
 
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
@@ -87,8 +87,7 @@ public class OllamaEmbeddingService implements EmbeddingService {
     }
 
     @Override
-    public EmbeddingSearchResult searchSimilar(String queryText, int maxResults, double minScore,
-                                               String language) {
+    public EmbeddingSearchResult<TextSegment> searchSimilar(String queryText, int maxResults, double minScore, String language) {
         Embedding queryEmbedding = embedText(queryText);
 
         EmbeddingSearchRequest request = EmbeddingSearchRequest.builder()
