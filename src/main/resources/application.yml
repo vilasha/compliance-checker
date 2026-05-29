@@ -109,7 +109,9 @@ compliance:
     top-k-results: 5
     similarity-threshold: 0.7
     max-policy-sections: 50
-    parse-retry-max: 4 # Total LLM calls per analysis = 1 + parse-retry-max
+    # Single-query RAG: max retries on JSON parse failure.
+    # Total LLM calls per analysis = 1 + parse-retry-max.
+    parse-retry-max: 4
 
     # Multi-Query Retrieval with Perspective Synthesis
     multi-query:
@@ -157,7 +159,15 @@ compliance:
     allowed-mime-types: application/pdf
     section-detection:
       enabled: true
-      heading-patterns: "^(Art\\.|§|Article|Section|Chapter|Artikel)"
+      # Detects headings as: Roman numerals (I, II, III, ..., XXXIX) or numeric markers,
+      # optionally with sub-numbering (e.g., "III.3.1"), followed by a required uppercase
+      # letter (\p{Lu} matches Unicode uppercase incl. ÄÖÜ). Also detects "§ N" paragraph
+      # markers. Markers like Art./Artikel/Article/Section/Chapter were removed because
+      # they appear constantly as inline references in regulatory prose and were causing
+      # false section splits at the wrong points. The negative lookahead excludes calendar
+      # dates ("1. Januar...", "30. April...") that PDF text wrap can place at line starts.
+      # See ADR-006 for the full rationale and remaining limits.
+      heading-patterns: '^[ \t]*(?![0-9]+\.[ \t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\b)(?:(?:[IVX]+|[0-9]+)\.(?:[0-9]+(?:\.[0-9]+)*\.?)?[ \t]+\p{Lu}|§[ \t]*[0-9]+)'
 
   # Audit Logging
   audit:
