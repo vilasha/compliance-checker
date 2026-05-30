@@ -23,7 +23,7 @@ class PdfProcessingServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(pdfProcessingService, "sectionDetectionEnabled", true);
         ReflectionTestUtils.setField(pdfProcessingService, "headingPatterns",
-                "^[ \\t]*(?![0-9]+\\.[ \\t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\\b)(?:(?:[IVX]+|[0-9]+)\\.(?:[0-9]+(?:\\.[0-9]+)*\\.?)?[ \\t]+\\p{Lu}|§[ \\t]*[0-9]+)");
+                "^[ \\t]*(?![0-9]+\\.[ \\t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\\b)(?:(?:[IVX]+|[0-9]+)\\.(?:[0-9]+(?:\\.[0-9]+)*\\.?)?[ \\t]+\\p{Lu}|§[ \\t]*[0-9]+|(?:Article|Chapter)[ \\t]+(?:[IVXLCDM]+|[0-9]+(?:[a-z]+)?)[ \\t]+\\p{Lu}\\p{Ll}+)");
         ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkSize", 1000);
         ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkOverlap", 200);
     }
@@ -181,6 +181,83 @@ class PdfProcessingServiceTest {
 
         assertThat(sections).hasSize(1);
         assertThat(sections.get(0).heading()).isEqualTo("Full Document");
+    }
+
+    // ----- Solvency II / English regulatory documents (ADR-007) -----
+
+    @Test
+    void detectSections_findsArticleHeadings() {
+        String text = """
+                Article 1 Subject matter
+                This Directive lays down rules concerning the following.
+                
+                Article 132 The prudent person principle
+                Member States shall ensure that insurance undertakings invest assets prudently.
+                """;
+
+        List<PolicySection> sections = pdfProcessingService.detectSections(text);
+
+        assertThat(sections).hasSize(2);
+        assertThat(sections.get(0).heading()).startsWith("Article 1 Subject matter");
+        assertThat(sections.get(1).heading()).startsWith("Article 132 The prudent person principle");
+    }
+
+    @Test
+    void detectSections_findsChapterHeadingsWithRomanNumeral() {
+        String text = """
+                Chapter VI Solvency capital requirement
+                General provisions for the Solvency Capital Requirement.
+                
+                Chapter VII Minimum capital requirement
+                Calculation of the Minimum Capital Requirement.
+                """;
+
+        List<PolicySection> sections = pdfProcessingService.detectSections(text);
+
+        assertThat(sections).hasSize(2);
+        assertThat(sections.get(0).heading()).startsWith("Chapter VI Solvency capital requirement");
+        assertThat(sections.get(1).heading()).startsWith("Chapter VII Minimum capital requirement");
+    }
+
+    @Test
+    void detectSections_findsArticleWithLetterSuffix() {
+        // EU directives use letter suffixes after amendments: "Article 132a", "Article 132bis".
+        String text = """
+                Article 132a Additional rules on group supervision
+                Inserted by Directive 2014/51/EU.
+                
+                Article 132bis Amended calculation method
+                Further amendments apply.
+                """;
+
+        List<PolicySection> sections = pdfProcessingService.detectSections(text);
+
+        assertThat(sections).hasSize(2);
+        assertThat(sections.get(0).heading()).startsWith("Article 132a Additional rules");
+        assertThat(sections.get(1).heading()).startsWith("Article 132bis Amended calculation method");
+    }
+
+    @Test
+    void detectSections_ignoresInlineArticleAndChapterReferences() {
+        // The Title-case-word requirement is what distinguishes a heading's title from
+        // an inline reference's continuing prose. Inline refs are followed by lowercase
+        // prepositions, parentheses, or punctuation — none of which match \p{Lu}\p{Ll}+.
+        String text = """
+                Article 100 General provisions
+                Member States shall require insurance undertakings to hold eligible own funds
+                covering the Solvency Capital Requirement as laid down in Article 101.
+                The calculation methodology in Article 132(1)(a) applies, with reference to
+                Chapter VI of Title I and Article 4, paragraph 2.
+                The principle applies as required by Article 132 of the Directive.
+                """;
+
+        List<PolicySection> sections = pdfProcessingService.detectSections(text);
+
+        // Only "Article 100 General provisions" should be detected; everything else is
+        // either an inline ref ("Article 101", "Article 132(1)(a)", "Chapter VI of...",
+        // "Article 4, paragraph 2", "Article 132 of...") or sentence-continuing prose.
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).heading()).startsWith("Article 100 General provisions");
     }
 
     @Test
