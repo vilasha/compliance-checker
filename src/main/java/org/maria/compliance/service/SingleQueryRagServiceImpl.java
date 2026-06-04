@@ -35,7 +35,7 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
     private final CompliancePromptBuilder promptBuilder;
     private final ObjectMapper objectMapper;
 
-    @Value("${compliance.ollama.chat-model:llama3.1:8b}")
+    @Value("${compliance.ollama.chat-model:qwen2.5:3b}")
     private String chatModelName;
     @Value("${compliance.rag.top-k-results:5}")
     private int topK;

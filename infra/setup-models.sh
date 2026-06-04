@@ -13,7 +13,7 @@ if [ -f "$(dirname "$0")/../.env" ]; then
   set +a
 fi
 
-CHAT_MODEL="${OLLAMA_CHAT_MODEL:-llama3.1:8b}"
+CHAT_MODEL="${OLLAMA_CHAT_MODEL:-qwen2.5:3b}"
 EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-bge-m3}"
 
 echo "Step 1: Checking if Ollama container is running..."

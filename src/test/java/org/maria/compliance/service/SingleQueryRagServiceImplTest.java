@@ -15,9 +15,9 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 @ActiveProfiles("test")
 class SingleQueryRagServiceImplTest {
 
-    private static final String CHAT_MODEL_NAME = "llama3.1:8b";
+    private static final String CHAT_MODEL_NAME = "qwen2.5:3b";
     private static final int PARSE_RETRY_MAX = 4;
     private static final int TOP_K = 5;
     private static final double MIN_SCORE = 0.7;
