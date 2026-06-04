@@ -5,7 +5,7 @@ echo ========================================
 echo.
 
 REM Load defaults (override via .env or set before running)
-if not defined OLLAMA_CHAT_MODEL set OLLAMA_CHAT_MODEL=llama3.1:8b
+if not defined OLLAMA_CHAT_MODEL set OLLAMA_CHAT_MODEL=qwen2.5:3b
 if not defined OLLAMA_EMBEDDING_MODEL set OLLAMA_EMBEDDING_MODEL=bge-m3
 
 echo Step 1: Checking if Ollama container is running...

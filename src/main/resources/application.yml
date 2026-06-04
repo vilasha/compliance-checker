@@ -91,9 +91,13 @@ compliance:
   # Ollama Configuration
   ollama:
     base-url: http://localhost:11434
-    chat-model: llama3.1:8b
+    chat-model: qwen2.5:3b
     embedding-model: bge-m3
-    timeout: 120s
+    # Per-request timeout. qwen2.5:3b on CPU with a substantial prompt (system
+    # instructions + retrieved chunks + policy section text) routinely takes
+    # 60–180 s per call. 5 minutes gives realistic headroom; failures still
+    # surface in reasonable time. If running on GPU, this can be tightened
+    timeout: 30m
     max-retries: 3
 
   # Embedding Store (PgVectorEmbeddingStore via LangChain4j)
@@ -171,8 +175,8 @@ compliance:
       #      prepositions ("of", "to"...), parentheses, or punctuation — none of which
       #      satisfy \p{Lu}\p{Ll}+ (uppercase letter followed by lowercase letters).
       # The negative lookahead excludes calendar dates ("1. Januar...", "30. April...")
-      # that PDF text wrap can place at line starts.
-      # See ADR-006 (original iteration) and ADR-007 (Solvency II re-addition).
+      # that PDF text wrap can place at line starts
+      # See ADR-006 (original iteration) and ADR-007 (Solvency II re-addition)
       heading-patterns: '^[ \t]*(?![0-9]+\.[ \t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\b)(?:(?:[IVX]+|[0-9]+)\.(?:[0-9]+(?:\.[0-9]+)*\.?)?[ \t]+\p{Lu}|§[ \t]*[0-9]+|(?:Article|Chapter)[ \t]+(?:[IVXLCDM]+|[0-9]+(?:[a-z]+)?)[ \t]+\p{Lu}\p{Ll}+)'
 
   # Audit Logging
@@ -199,9 +203,9 @@ compliance:
         enabled: true
 
   # FINMA Scraper (activated with --spring.profiles.active=dev,scrape)
-  # GUIDs are Sitecore item IDs for document type categories.
+  # GUIDs are Sitecore item IDs for document type categories
   # Stable unless FINMA restructures their CMS. To verify or find new GUIDs:
-  # DevTools → Network → XHR → select a filter → check --data-raw for the Dokumentenart value.
+  # DevTools → Network → XHR → select a filter → check --data-raw for the Dokumentenart value
   scraper:
     finma:
       url: https://www.finma.ch/de/dokumente/
@@ -219,7 +223,13 @@ compliance:
     async: true
     thread-pool-size: 5
     queue-capacity: 100
-    sse-timeout: 300s
+    # SSE connection timeout. Must cover the longest possible analysis on the slowest
+    # supported hardware: N sections × (ollama.timeout × (1 + ollama.max-retries)) in
+    # the worst case. 1 hour covers a ~12-section analysis with the current 30 min
+    # per-call timeout. EventSource auto-reconnects on timeout and the StatusController
+    # replays history from the in-memory bus, so the practical impact of a too-short
+    # value is wasted reconnects, not lost data
+    sse-timeout: 1h
 
   # Security Configuration (Local)
   security:

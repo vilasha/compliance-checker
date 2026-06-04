@@ -93,12 +93,56 @@
                         <strong>Selected file:</strong> <span id="fileNameText"></span>
                     </div>
 
+                    <div class="mt-3">
+                        <label class="form-label" for="languageSelect">Document language</label>
+                        <select class="form-select" id="languageSelect" name="language">
+                            <option selected value="de">German (de)</option>
+                            <option value="en">English (en)</option>
+                            <option value="fr">French (fr)</option>
+                            <option value="it">Italian (it)</option>
+                        </select>
+                    </div>
+
                     <div class="d-grid gap-2 mt-4">
                         <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
                             Analyze Document
                         </button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Analysis Progress Panel (hidden until upload starts) -->
+            <div class="card mt-4 border-0 shadow-sm" id="analysisProgressCard" style="display: none;">
+                <div class="card-body">
+                    <h5 class="card-title">Analysis in progress</h5>
+                    <p class="text-muted mb-2" id="analysisProgressMessage">Preparing…</p>
+                    <div class="progress" style="height: 1.5rem;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="analysisProgressBar"
+                             role="progressbar" style="width: 0%;">0%
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2 d-block" id="analysisProgressDetail"></small>
+                </div>
+            </div>
+
+            <!-- Analysis Results Panel (hidden until completion) -->
+            <div class="card mt-4 border-0 shadow-sm" id="analysisResultsCard" style="display: none;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h5 class="card-title mb-0">Analysis Results</h5>
+                        <span class="badge fs-6" id="aggregateRiskBadge"></span>
+                    </div>
+                    <p class="text-muted" id="analysisSummary"></p>
+                    <div id="sectionResultsList"></div>
+                </div>
+            </div>
+
+            <!-- Analysis Error Panel (hidden until failure) -->
+            <div class="card mt-4 border-0 shadow-sm border-danger" id="analysisErrorCard" style="display: none;">
+                <div class="card-body">
+                    <h5 class="card-title text-danger">Analysis failed</h5>
+                    <p class="mb-0" id="analysisErrorMessage"></p>
+                </div>
             </div>
 
             <!-- Info Card -->
@@ -193,11 +237,268 @@
         }
     });
 
-    // Form submission (placeholder - will be replaced with SSE)
-    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    // Upload form: POST to /api/upload, then subscribe to /api/status/{taskId} via SSE.
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        alert('Upload functionality will be implemented in the next step!');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const language = document.getElementById('languageSelect').value;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('language', language);
+
+        resetAnalysisPanels();
+        showProgress('Uploading…', 0);
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/upload', { method: 'POST', body: formData });
+            if (!response.ok) {
+                const errBody = await response.json().catch(() => ({ error: 'Upload failed' }));
+                throw new Error(errBody.error || 'Upload failed (' + response.status + ')');
+            }
+            const { taskId } = await response.json();
+            showProgress('Upload accepted. Connecting to analysis stream…', 2);
+            subscribeToStatus(taskId);
+        } catch (err) {
+            showError(err.message);
+            submitBtn.disabled = false;
+        }
     });
+
+    function subscribeToStatus(taskId) {
+        const source = new EventSource('/api/status/' + encodeURIComponent(taskId));
+
+        // Watchdog: tracks time since the last event. If the stream goes silent for
+        // a long time the user sees a warning, and after a hard cap we declare the
+        // stream dead — better than a permanently spinning UI when the worker hangs.
+        const WARN_AFTER_MS = 2 * 60 * 1000;       // 2 min: show "still working" hint
+        const HARD_CAP_MS   = 45 * 60 * 1000;      // 45 min: declare stream dead
+        let warnTimer = null;
+        let hardTimer = null;
+
+        const armWatchdog = () => {
+            if (warnTimer) clearTimeout(warnTimer);
+            if (hardTimer) clearTimeout(hardTimer);
+            warnTimer = setTimeout(showStallWarning, WARN_AFTER_MS);
+            hardTimer = setTimeout(() => {
+                source.close();
+                showError('Analysis stream has been silent for too long. The backend may be stuck '
+                        + 'or the LLM is unreachable. Check the server logs and re-upload.');
+                submitBtn.disabled = false;
+            }, HARD_CAP_MS);
+        };
+
+        const disarmWatchdog = () => {
+            if (warnTimer) clearTimeout(warnTimer);
+            if (hardTimer) clearTimeout(hardTimer);
+            warnTimer = null;
+            hardTimer = null;
+        };
+
+        const handle = (event) => {
+            armWatchdog(); // any event = backend is alive; reset the timer
+            clearStallWarning();
+            try {
+                const payload = JSON.parse(event.data);
+                handleTaskEvent(payload);
+                if (payload.type === 'COMPLETED' || payload.type === 'FAILED') {
+                    disarmWatchdog();
+                    source.close();
+                    submitBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Failed to parse event', err);
+            }
+        };
+
+        // Named SSE events match TaskEventType values.
+        ['UPLOADED', 'EXTRACTING', 'SECTIONS_DETECTED', 'SECTION_STARTED', 'SECTION_ANALYZED', 'COMPLETED', 'FAILED']
+            .forEach(name => source.addEventListener(name, handle));
+
+        source.onopen = () => armWatchdog(); // also arm on reconnect
+        source.onerror = () => {
+            // EventSource auto-retries on network errors; only treat as fatal if the stream is closed.
+            if (source.readyState === EventSource.CLOSED) {
+                disarmWatchdog();
+                showError('Connection to analysis stream lost.');
+                submitBtn.disabled = false;
+            }
+        };
+
+        armWatchdog();
+    }
+
+    function showStallWarning() {
+        const det = document.getElementById('analysisProgressDetail');
+        if (det) {
+            det.innerHTML = '<span class="text-warning">⚠ No update from the backend in 2 minutes. '
+                    + 'The LLM may be slow or unreachable — see server logs if this persists.</span>';
+        }
+    }
+
+    function clearStallWarning() {
+        const det = document.getElementById('analysisProgressDetail');
+        if (det && det.querySelector('.text-warning')) {
+            det.textContent = '';
+        }
+    }
+
+    function handleTaskEvent(ev) {
+        switch (ev.type) {
+            case 'UPLOADED':
+                showProgress(ev.message || 'Uploaded', 5);
+                break;
+            case 'EXTRACTING':
+                showProgress(ev.message || 'Extracting text…', 10);
+                break;
+            case 'SECTIONS_DETECTED':
+                showProgress(ev.message || 'Sections detected', 15,
+                        'Detected ' + (ev.sectionsTotal || 0) + ' section(s) to analyze');
+                break;
+            case 'SECTION_STARTED': {
+                const total = ev.sectionsTotal || 1;
+                const startIdx = (ev.sectionsCompleted || 0) + 1;
+                const pct = Math.min(95, 15 + Math.round(((startIdx - 1) / total) * 80));
+                showProgress(ev.message || 'Analyzing section…', pct,
+                        'Section ' + startIdx + ' of ' + total + ' — this can take several minutes per section on CPU-only Ollama');
+                break;
+            }
+            case 'SECTION_ANALYZED': {
+                const total = ev.sectionsTotal || 1;
+                const done = ev.sectionsCompleted || 0;
+                const pct = Math.min(95, 15 + Math.round((done / total) * 80));
+                showProgress(ev.message || 'Analyzing…', pct,
+                        'Section ' + done + ' of ' + total);
+                break;
+            }
+            case 'COMPLETED':
+                renderReport(ev.report, ev.message);
+                break;
+            case 'FAILED':
+                showError(ev.errorMessage || ev.message || 'Analysis failed');
+                break;
+        }
+    }
+
+    function resetAnalysisPanels() {
+        document.getElementById('analysisResultsCard').style.display = 'none';
+        document.getElementById('analysisErrorCard').style.display = 'none';
+        document.getElementById('sectionResultsList').innerHTML = '';
+    }
+
+    function showProgress(message, percent, detail) {
+        const card = document.getElementById('analysisProgressCard');
+        const msg = document.getElementById('analysisProgressMessage');
+        const bar = document.getElementById('analysisProgressBar');
+        const det = document.getElementById('analysisProgressDetail');
+        card.style.display = '';
+        msg.textContent = message;
+        bar.style.width = percent + '%';
+        bar.textContent = percent + '%';
+        det.textContent = detail || '';
+    }
+
+    function showError(message) {
+        document.getElementById('analysisProgressCard').style.display = 'none';
+        document.getElementById('analysisErrorCard').style.display = '';
+        document.getElementById('analysisErrorMessage').textContent = message;
+    }
+
+    function riskBadgeClass(risk) {
+        return risk === 'HIGH' ? 'bg-danger'
+             : risk === 'MEDIUM' ? 'bg-warning text-dark'
+             : 'bg-success';
+    }
+
+    function severityBadgeClass(severity) {
+        return severity === 'HIGH' ? 'bg-danger'
+             : severity === 'MEDIUM' ? 'bg-warning text-dark'
+             : 'bg-info text-dark';
+    }
+
+    function escapeHtml(s) {
+        return (s || '').replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function renderReport(report, completionMessage) {
+        document.getElementById('analysisProgressCard').style.display = 'none';
+        const card = document.getElementById('analysisResultsCard');
+        card.style.display = '';
+
+        const risk = report.aggregateRisk || 'LOW';
+        const riskBadge = document.getElementById('aggregateRiskBadge');
+        riskBadge.textContent = 'Overall risk: ' + risk;
+        riskBadge.className = 'badge fs-6 ' + riskBadgeClass(risk);
+
+        document.getElementById('analysisSummary').textContent =
+                (completionMessage || '') + ' · processed in ' +
+                Math.round((report.totalProcessingTimeMs || 0) / 1000) + 's';
+
+        const list = document.getElementById('sectionResultsList');
+        list.innerHTML = '';
+        (report.sectionResults || []).forEach((section, idx) => {
+            list.appendChild(renderSectionCard(section, idx + 1));
+        });
+    }
+
+    function classifySectionStatus(section) {
+        // SingleQueryRagServiceImpl emits these patterns in `recommendation` when
+        // analysis short-circuits or fails. Pattern-matching the recommendation is
+        // pragmatic until ComplianceAnalysisResult carries an explicit status field.
+        const rec = (section.recommendation || '').trim();
+        if (rec.startsWith('Compliance analysis failed')) {
+            return { kind: 'error', label: 'Failed', badge: 'bg-danger',
+                     border: 'border-danger', note: 'This section could not be analyzed.' };
+        }
+        if (rec.startsWith('LLM response could not be parsed')) {
+            return { kind: 'warning', label: 'Unparsed', badge: 'bg-warning text-dark',
+                     border: 'border-warning', note: 'The LLM response was unparseable after retries.' };
+        }
+        if (rec.startsWith('No relevant regulatory context')) {
+            return { kind: 'info', label: 'No context', badge: 'bg-secondary',
+                     border: '', note: 'No matching regulatory context above the similarity threshold.' };
+        }
+        return { kind: 'ok', label: section.overallRisk || 'LOW',
+                 badge: riskBadgeClass(section.overallRisk), border: '', note: null };
+    }
+
+    function renderSectionCard(section, ordinal) {
+        const wrapper = document.createElement('div');
+        const status = classifySectionStatus(section);
+        wrapper.className = 'card mb-3' + (status.border ? ' ' + status.border : '');
+
+        const heading = (section.policySection || '').slice(0, 120) +
+                ((section.policySection || '').length > 120 ? '…' : '');
+
+        const violations = (section.violations || []);
+        const violationHtml = violations.length === 0
+            ? (status.note
+                ? `<p class="text-${status.kind === 'error' ? 'danger' : status.kind === 'warning' ? 'warning' : 'muted'} mb-0">${escapeHtml(status.note)}</p>`
+                : '<p class="text-muted mb-0">No violations detected for this section.</p>')
+            : violations.map(v => `
+                <div class="border-start border-3 ps-3 mb-3"
+                     style="border-color: ${v.severity === 'HIGH' ? '#dc3545' : v.severity === 'MEDIUM' ? '#ffc107' : '#0dcaf0'} !important;">
+                    <span class="badge ${severityBadgeClass(v.severity)} mb-1">${escapeHtml(v.severity)}</span>
+                    <div><strong>Source:</strong> ${escapeHtml(v.source || '—')}</div>
+                    <blockquote class="blockquote-footer mt-2 mb-1">${escapeHtml(v.regulatoryText)}</blockquote>
+                    <div>${escapeHtml(v.violationDetail)}</div>
+                </div>`).join('');
+
+        wrapper.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-subtitle text-muted">Section ${ordinal}</h6>
+                    <span class="badge ${status.badge}">${escapeHtml(status.label)}</span>
+                </div>
+                <p class="small text-muted">${escapeHtml(heading)}</p>
+                ${violationHtml}
+                ${section.recommendation ? `<p class="mt-2 mb-0"><strong>Recommendation:</strong> ${escapeHtml(section.recommendation)}</p>` : ''}
+            </div>`;
+        return wrapper;
+    }
 
     // URL ingestion
     document.getElementById('urlIngestForm').addEventListener('submit', function(e) {

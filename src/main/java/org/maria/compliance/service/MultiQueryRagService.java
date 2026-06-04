@@ -93,7 +93,7 @@ public interface MultiQueryRagService {
     /**
      * Step 5: Send synthesis prompt to fine-tuned LLM
      * <p>
-     * Calls Ollama with the fine-tuned llama3.1:8b model
+     * Calls Ollama with the fine-tuned qwen2.5:3b model
      * Model is trained to analyze from multiple perspectives
      * and produce structured violation reports
      *

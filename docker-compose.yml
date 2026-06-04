@@ -64,8 +64,8 @@ services:
     command:
       - -c
       - |
-        echo "Pulling ${OLLAMA_CHAT_MODEL:-llama3.1:8b}..."
-        ollama pull ${OLLAMA_CHAT_MODEL:-llama3.1:8b}
+        echo "Pulling ${OLLAMA_CHAT_MODEL:-qwen2.5:3b}..."
+        ollama pull ${OLLAMA_CHAT_MODEL:-qwen2.5:3b}
         echo "Pulling ${OLLAMA_EMBEDDING_MODEL:-bge-m3}..."
         ollama pull ${OLLAMA_EMBEDDING_MODEL:-bge-m3}
         echo "All models ready."
