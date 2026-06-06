@@ -24,8 +24,8 @@ class PdfProcessingServiceTest {
         ReflectionTestUtils.setField(pdfProcessingService, "sectionDetectionEnabled", true);
         ReflectionTestUtils.setField(pdfProcessingService, "headingPatterns",
                 "^[ \\t]*(?![0-9]+\\.[ \\t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\\b)(?:(?:[IVX]+|[0-9]+)\\.(?:[0-9]+(?:\\.[0-9]+)*\\.?)?[ \\t]+\\p{Lu}|§[ \\t]*[0-9]+|(?:Article|Chapter)[ \\t]+(?:[IVXLCDM]+|[0-9]+(?:[a-z]+)?)[ \\t]+\\p{Lu}\\p{Ll}+)");
-        ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkSize", 1000);
-        ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkOverlap", 200);
+        ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkSize", 1024);
+        ReflectionTestUtils.setField(pdfProcessingService, "defaultChunkOverlap", 256);
     }
 
     @Test
@@ -264,10 +264,10 @@ class PdfProcessingServiceTest {
     void chunkText_producesFixedSizeChunks() {
         String text = "A".repeat(2500);
 
-        List<ChunkResult> chunks = pdfProcessingService.chunkText(text, 1000, 200);
+        List<ChunkResult> chunks = pdfProcessingService.chunkText(text, 1024, 256);
 
         assertThat(chunks).hasSizeGreaterThan(2);
-        assertThat(chunks.get(0).text()).hasSize(1000);
+        assertThat(chunks.get(0).text()).hasSize(1024);
     }
 
     @Test

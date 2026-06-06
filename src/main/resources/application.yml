@@ -108,8 +108,8 @@ compliance:
 
   # RAG Configuration with Multi-Query Enhancement
   rag:
-    chunk-size: 1000
-    chunk-overlap: 200
+    chunk-size: 1024
+    chunk-overlap: 256
     top-k-results: 5
     similarity-threshold: 0.7
     max-policy-sections: 50

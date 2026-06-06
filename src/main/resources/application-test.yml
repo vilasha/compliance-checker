@@ -16,5 +16,5 @@ compliance:
       enabled: true
       heading-patterns: '^[ \t]*(?![0-9]+\.[ \t]+(?:Januar|January|Februar|February|März|March|April|Mai|May|Juni|June|Juli|July|August|September|Oktober|October|November|Dezember|December)\b)(?:(?:[IVX]+|[0-9]+)\.(?:[0-9]+(?:\.[0-9]+)*\.?)?[ \t]+\p{Lu}|§[ \t]*[0-9]+|(?:Article|Chapter)[ \t]+(?:[IVXLCDM]+|[0-9]+(?:[a-z]+)?)[ \t]+\p{Lu}\p{Ll}+)'
   rag:
-    chunk-size: 1000
-    chunk-overlap: 200
+    chunk-size: 1024
+    chunk-overlap: 256

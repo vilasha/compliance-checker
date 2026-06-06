@@ -27,10 +27,10 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
     @Value("${compliance.pdf.section-detection.heading-patterns:^(Art\\.|§|Article|Section|Chapter|Artikel)}")
     private String headingPatterns;
 
-    @Value("${compliance.rag.chunk-size:1000}")
+    @Value("${compliance.rag.chunk-size:1024}")
     private int defaultChunkSize;
 
-    @Value("${compliance.rag.chunk-overlap:200}")
+    @Value("${compliance.rag.chunk-overlap:256}")
     private int defaultChunkOverlap;
 
     @Override
