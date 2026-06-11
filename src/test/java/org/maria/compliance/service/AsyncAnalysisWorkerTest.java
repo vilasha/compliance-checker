@@ -95,6 +95,53 @@ class AsyncAnalysisWorkerTest {
     }
 
     @Test
+    void run_capCountsAnalysisUnitsAfterSplitting_notDetectedSections() {
+        // One heading-less oversized section fans out into many parts; the
+        // max-policy-sections cap must bound the *units analyzed*, not the
+        // detected-heading count (which here is 1)
+        String taskId = "task-cap";
+        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        AsyncAnalysisWorker cappedWorker = new AsyncAnalysisWorker(pdfProcessingService, ragService,
+                eventBus, uploadRepository, objectMapper, 2, 10);
+
+        String oversized = "x".repeat(50);
+        when(pdfProcessingService.extractText(any(byte[].class), anyString())).thenReturn(oversized);
+        when(pdfProcessingService.detectSections(oversized)).thenReturn(List.of(
+                PolicySection.builder().heading("Full Document").content(oversized)
+                        .startPosition(0).endPosition(oversized.length()).build()
+        ));
+        when(pdfProcessingService.chunkText(eq(oversized), eq(10), anyInt())).thenReturn(List.of(
+                chunk("part-a", 0, 10),
+                chunk("part-b", 10, 20),
+                chunk("part-c", 20, 30),
+                chunk("part-d", 30, 40),
+                chunk("part-e", 40, 50)
+        ));
+        when(ragService.analyze(anyString(), eq("de"))).thenReturn(violationResult());
+
+        cappedWorker.run(taskId, new byte[]{1}, "huge.pdf", "de");
+
+        verify(ragService, times(2)).analyze(anyString(), eq("de"));
+
+        ArgumentCaptor<TaskEvent> events = ArgumentCaptor.forClass(TaskEvent.class);
+        verify(eventBus, atLeastOnce()).publish(events.capture());
+        TaskEvent detectedEvent = events.getAllValues().stream()
+                .filter(e -> e.type() == TaskEventType.SECTIONS_DETECTED)
+                .findFirst().orElseThrow();
+        assertThat(detectedEvent.sectionsTotal()).isEqualTo(2);
+        assertThat(detectedEvent.message()).contains("NOT covered");
+    }
+
+    private ChunkResult chunk(String text, int start, int end) {
+        return ChunkResult.builder()
+                .text(text)
+                .chunkIndex(0)
+                .startPosition(start)
+                .endPosition(end)
+                .build();
+    }
+
+    @Test
     void run_failure_emitsFailedEventAndPersistsStatus() {
         String taskId = "task-fail";
         when(pdfProcessingService.extractText(any(byte[].class), anyString()))

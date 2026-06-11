@@ -19,7 +19,7 @@ import java.util.List;
  * {@code @Async} method from the same class via {@code this.foo()} would
  * bypass the proxy and run synchronously. Cross-bean invocation is the
  * idiomatic fix (alternatives: AopContext.currentProxy(), self-injection;
- * both work but obscure the intent).
+ * both work but obscure the intent)
  */
 @Service
 @Slf4j
@@ -68,14 +68,15 @@ public class AsyncAnalysisWorker {
 
             String text = pdfProcessingService.extractText(pdfBytes, fileName);
             List<PolicySection> detected = pdfProcessingService.detectSections(text);
-            List<PolicySection> sections = prepareSections(detected);
+            Prepared prepared = prepareSections(detected);
+            List<PolicySection> sections = prepared.sections();
             int total = sections.size();
 
             eventBus.publish(TaskEvent.builder()
                     .taskId(taskId)
                     .type(TaskEventType.SECTIONS_DETECTED)
                     .timestamp(Instant.now())
-                    .message(sectionsDetectedMessage(detected.size(), total))
+                    .message(sectionsDetectedMessage(detected.size(), prepared))
                     .sectionsTotal(total)
                     .build());
 
@@ -138,23 +139,34 @@ public class AsyncAnalysisWorker {
     }
 
     /**
+     * Outcome of section preparation: the analysis units to run, plus whether the
+     * {@code max-policy-sections} cap cut anything off (needed for honest progress
+     * messaging — a truncated scan must say so)
+     */
+    private record Prepared(List<PolicySection> sections, boolean truncated) {
+    }
+
+    /**
      * Enforces the two size limits that protect the LLM pipeline:
      * <ul>
-     *   <li>{@code max-policy-sections} caps the number of analysis units, bounding
-     *       total runtime (previously configured but enforced nowhere);</li>
      *   <li>{@code max-section-chars} splits oversized sections — when heading detection
      *       finds nothing, "one section" is the whole document, which silently blows the
      *       embedding-query and chat-context budgets. Splitting keeps full coverage,
-     *       unlike truncation, which a compliance tool must never do silently.</li>
+     *       unlike truncation, which a compliance tool must never do silently;</li>
+     *   <li>{@code max-policy-sections} caps the number of analysis units <em>after</em>
+     *       splitting, bounding total LLM calls and therefore runtime. The cap counts
+     *       units, not detected headings: a single heading-less 500&nbsp;KB document
+     *       fans out into many parts, and counting before the split would let it
+     *       blow straight through the limit</li>
      * </ul>
      */
-    private List<PolicySection> prepareSections(List<PolicySection> detected) {
-        List<PolicySection> capped = detected.size() > maxPolicySections
-                ? detected.subList(0, maxPolicySections)
-                : detected;
+    private Prepared prepareSections(List<PolicySection> detected) {
+        List<PolicySection> prepared = new ArrayList<>();
 
-        List<PolicySection> prepared = new ArrayList<>(capped.size());
-        for (PolicySection section : capped) {
+        for (PolicySection section : detected) {
+            if (prepared.size() >= maxPolicySections) {
+                return new Prepared(prepared, true);
+            }
             if (section.content() == null || section.content().length() <= maxSectionChars) {
                 prepared.add(renumbered(section, prepared.size() + 1));
                 continue;
@@ -162,6 +174,9 @@ public class AsyncAnalysisWorker {
             List<ChunkResult> parts = pdfProcessingService.chunkText(
                     section.content(), maxSectionChars, SPLIT_OVERLAP_CHARS);
             for (int p = 0; p < parts.size(); p++) {
+                if (prepared.size() >= maxPolicySections) {
+                    return new Prepared(prepared, true);
+                }
                 ChunkResult part = parts.get(p);
                 prepared.add(PolicySection.builder()
                         .sectionNumber(prepared.size() + 1)
@@ -172,7 +187,7 @@ public class AsyncAnalysisWorker {
                         .build());
             }
         }
-        return prepared;
+        return new Prepared(prepared, false);
     }
 
     private PolicySection renumbered(PolicySection section, int number) {
@@ -185,13 +200,15 @@ public class AsyncAnalysisWorker {
                 .build();
     }
 
-    private String sectionsDetectedMessage(int detectedCount, int preparedCount) {
+    private String sectionsDetectedMessage(int detectedCount, Prepared prepared) {
+        int preparedCount = prepared.sections().size();
+        if (prepared.truncated()) {
+            return "Detected " + detectedCount + " section(s); analyzing the first "
+                    + preparedCount + " analysis unit(s) (max-policy-sections limit) — "
+                    + "the remainder of the document is NOT covered by this report";
+        }
         if (detectedCount == preparedCount) {
             return "Detected " + detectedCount + " section(s)";
-        }
-        if (detectedCount > maxPolicySections) {
-            return "Detected " + detectedCount + " section(s), analyzing the first "
-                    + maxPolicySections + " (max-policy-sections limit)";
         }
         return "Detected " + detectedCount + " section(s), split into "
                 + preparedCount + " analysis unit(s) due to section length";
