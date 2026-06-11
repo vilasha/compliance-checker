@@ -3,40 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Compliance Checker</title>
+    <title>Sign in — Compliance Checker</title>
     <link th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #050709;
+            --panel: #0C1014;
+            --panel-2: #10151B;
+            --border: #1E262E;
+            --border-strong: #2C3640;
+            --ink: #E6EBEE;
+            --dim: #8A98A3;
+            --accent: #62F9FA;
+            --accent-dark: #46C4C5;
+            --c-danger: #F2555A;
+            --c-warn: #E0A83E;
+            --c-ok: #3DD68C;
+            --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+            --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+        }
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: var(--bg);
+            color: var(--ink);
+            font-family: var(--font-body);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 1rem;
         }
         .login-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            padding: 2rem;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2.25rem 2rem 1.75rem;
             max-width: 400px;
             width: 100%;
         }
-        .login-header {
+        .login-header { margin-bottom: 1.75rem; }
+        .login-header .brand {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+        .login-header .mark {
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+        .login-header p {
+            color: var(--dim);
+            font-size: .85rem;
+            margin: .5rem 0 0 1.6rem;
+        }
+        .form-label { font-size: .8rem; font-weight: 500; color: var(--dim); }
+        .form-control {
+            background-color: var(--panel-2);
+            border: 1px solid var(--border-strong);
+            border-radius: 4px;
+            color: var(--ink);
+            font-size: .9rem;
+        }
+        .form-control:focus {
+            background-color: var(--panel-2);
+            border-color: var(--accent-dark);
+            color: var(--ink);
+            box-shadow: 0 0 0 .2rem rgba(98, 249, 250, .12);
+        }
+        .form-control::placeholder { color: var(--dim); }
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            border-radius: 4px;
+            color: #06181A;
+            font-weight: 500;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background: #7FFBFC;
+            border-color: #7FFBFC;
+            color: #06181A;
+        }
+        .btn-primary:focus-visible { box-shadow: 0 0 0 .2rem rgba(98, 249, 250, .25); }
+        .alert { border-radius: 4px; font-size: .85rem; }
+        .alert-danger  { background: rgba(242, 85, 90, .08);  border: 1px solid rgba(242, 85, 90, .4);  color: var(--c-danger); }
+        .alert-success { background: rgba(61, 214, 140, .08); border: 1px solid rgba(61, 214, 140, .4); color: var(--c-ok); }
+        .alert-warning { background: rgba(224, 168, 62, .08); border: 1px solid rgba(224, 168, 62, .4); color: var(--c-warn); }
+        .footnote {
+            color: var(--dim);
+            font-size: .78rem;
             text-align: center;
-            margin-bottom: 2rem;
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--border);
         }
-        .login-header h1 {
-            color: #667eea;
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
+        .footnote code { font-family: var(--font-mono); color: var(--dim); font-size: .78rem; }
     </style>
 </head>
-<body>
+<body data-bs-theme="dark">
 <div class="login-card">
     <div class="login-header">
-        <h1>🏛️ Compliance Checker</h1>
-        <p class="text-muted">Insurance Regulatory Compliance Tool</p>
+        <div class="brand">
+            <span class="mark"></span>
+            <span>Compliance Checker</span>
+        </div>
+        <p>Regulatory compliance analysis for insurance policies</p>
     </div>
 
     <div th:if="${param.error}" class="alert alert-danger">
@@ -54,26 +130,22 @@
     <form th:action="@{/login}" method="post">
         <div class="mb-3">
             <label for="username" class="form-label">Username</label>
-            <input type="text" class="form-control" id="username" name="username"
-                   placeholder="Enter username" required autofocus>
+            <input type="text" class="form-control" id="username" name="username" required autofocus>
         </div>
 
         <div class="mb-3">
             <label for="password" class="form-label">Password</label>
-            <input type="password" class="form-control" id="password" name="password"
-                   placeholder="Enter password" required>
+            <input type="password" class="form-control" id="password" name="password" required>
         </div>
 
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg">Login</button>
+        <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-primary btn-lg">Sign in</button>
         </div>
     </form>
 
-    <div class="mt-3 text-center text-muted small">
-        <p>Default credentials: admin / admin123</p>
+    <div class="footnote">
+        Development credentials: <code>admin</code> / <code>admin123</code>
     </div>
 </div>
-
-<script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
 </body>
 </html>

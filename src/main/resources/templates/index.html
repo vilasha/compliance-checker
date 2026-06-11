@@ -4,93 +4,327 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compliance Checker - Home</title>
+    <title>Compliance Checker</title>
     <link th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        /* Dark, restrained, enterprise. Black ground, #62F9FA reserved for
+           the primary action, focus states, and data highlights. */
+        :root {
+            --bg: #050709;
+            --panel: #0C1014;
+            --panel-2: #10151B;
+            --border: #1E262E;
+            --border-strong: #2C3640;
+            --ink: #E6EBEE;
+            --dim: #8A98A3;
+            --accent: #62F9FA;
+            --accent-dark: #46C4C5;
+            --c-danger: #F2555A;
+            --c-warn: #E0A83E;
+            --c-ok: #3DD68C;
+            --c-info: #62F9FA;
+            --c-unknown: #8A98A3;
+            --font-body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+            --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+        }
+
         body {
-            background-color: #f8f9fa;
+            background-color: var(--bg);
+            color: var(--ink);
+            font-family: var(--font-body);
+            font-size: .9375rem;
+            min-height: 100vh;
         }
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        h1, h2, h3, h4, h5, h6 { font-weight: 600; letter-spacing: -.01em; }
+        .mono { font-family: var(--font-mono); }
+
+        /* ---- Top bar ---- */
+        .topbar {
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            padding: .8rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
         }
-        .main-container {
-            margin-top: 2rem;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            font-weight: 600;
+            font-size: .95rem;
+            color: var(--ink);
         }
-        .upload-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            padding: 2rem;
+        .brand .mark {
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 2px;
+            flex: 0 0 auto;
         }
+        .brand .sub {
+            color: var(--dim);
+            font-weight: 400;
+            border-left: 1px solid var(--border-strong);
+            padding-left: .65rem;
+            margin-left: .1rem;
+            font-size: .85rem;
+        }
+        .session {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--dim);
+            font-size: .82rem;
+        }
+        .session strong { color: var(--ink); font-weight: 500; }
+
+        .shell { padding: 2.5rem 0 4rem; }
+
+        /* ---- Panels ---- */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.75rem;
+        }
+        .eyebrow {
+            font-size: .7rem;
+            font-weight: 500;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--dim);
+            margin-bottom: .6rem;
+        }
+        .lead-dim { color: var(--dim); font-size: .9rem; }
+
+        /* ---- Upload area ---- */
         .upload-zone {
-            border: 3px dashed #667eea;
-            border-radius: 10px;
-            padding: 3rem;
+            border: 1px dashed var(--border-strong);
+            border-radius: 6px;
+            background: var(--panel-2);
+            padding: 2.5rem 2rem;
             text-align: center;
-            background-color: #f8f9ff;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: border-color .15s, background-color .15s;
         }
-        .upload-zone:hover {
-            background-color: #e8ebff;
-            border-color: #764ba2;
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent-dark);
+            background: #121920;
         }
-        .upload-zone.dragover {
-            background-color: #d0d5ff;
-            border-color: #667eea;
+        .upload-zone .doc-icon {
+            width: 34px;
+            height: 42px;
+            border: 1.5px solid var(--dim);
+            border-radius: 3px;
+            margin: 0 auto 1rem;
+            position: relative;
+        }
+        .upload-zone .doc-icon::before, .upload-zone .doc-icon::after {
+            content: "";
+            position: absolute;
+            left: 7px;
+            right: 7px;
+            height: 1.5px;
+            background: var(--dim);
+        }
+        .upload-zone .doc-icon::before { top: 11px; }
+        .upload-zone .doc-icon::after { top: 18px; right: 14px; }
+        .upload-zone:hover .doc-icon, .upload-zone.dragover .doc-icon { border-color: var(--accent); }
+        .upload-zone:hover .doc-icon::before, .upload-zone:hover .doc-icon::after,
+        .upload-zone.dragover .doc-icon::before, .upload-zone.dragover .doc-icon::after { background: var(--accent); }
+        .upload-zone h5 { font-size: 1rem; margin-bottom: .35rem; }
+        .upload-zone .hint { color: var(--dim); font-size: .8rem; }
+        .file-readout {
+            font-family: var(--font-mono);
+            font-size: .82rem;
+            color: var(--dim);
+        }
+        .file-readout span { color: var(--accent); }
+
+        /* ---- Controls ---- */
+        .btn { border-radius: 4px; font-weight: 500; font-size: .875rem; }
+        .btn-lg { font-size: .9375rem; padding: .6rem 1rem; }
+        .btn-success {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #06181A;
+        }
+        .btn-success:hover, .btn-success:focus {
+            background: #7FFBFC;
+            border-color: #7FFBFC;
+            color: #06181A;
+        }
+        .btn-success:disabled {
+            background: var(--panel-2);
+            border-color: var(--border-strong);
+            color: var(--dim);
+        }
+        .btn-primary {
+            background: transparent;
+            border-color: var(--border-strong);
+            color: var(--ink);
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background: var(--panel-2);
+            border-color: var(--accent-dark);
+            color: var(--ink);
+        }
+        .btn-outline-light {
+            border-color: var(--border-strong);
+            color: var(--dim);
+            border-radius: 4px;
+        }
+        .btn-outline-light:hover { background: var(--panel-2); border-color: var(--accent-dark); color: var(--ink); }
+        .btn:focus-visible { box-shadow: 0 0 0 .2rem rgba(98, 249, 250, .25); }
+
+        .form-control, .form-select {
+            background-color: var(--panel-2);
+            border: 1px solid var(--border-strong);
+            border-radius: 4px;
+            color: var(--ink);
+            font-size: .9rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: var(--panel-2);
+            border-color: var(--accent-dark);
+            color: var(--ink);
+            box-shadow: 0 0 0 .2rem rgba(98, 249, 250, .12);
+        }
+        .form-control::placeholder { color: var(--dim); }
+        .form-select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%238A98A3' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        }
+        .form-label { font-size: .8rem; font-weight: 500; color: var(--dim); }
+
+        /* ---- Cards (progress / results / errors) ---- */
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--ink);
+        }
+        .card .card-title { font-size: 1rem; }
+        .card.border-danger { border-color: rgba(242, 85, 90, .5); }
+        .card.border-warning { border-color: rgba(224, 168, 62, .5); }
+        .progress {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .progress-bar {
+            background-color: var(--accent);
+            background-image: none;
+            color: #06181A;
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            font-weight: 500;
+        }
+        #analysisProgressMessage { font-size: .9rem; }
+        #analysisProgressDetail { color: var(--dim); font-size: .78rem; }
+        #analysisSummary { font-family: var(--font-mono); font-size: .78rem; }
+        .text-muted { color: var(--dim) !important; }
+        .text-warning { color: var(--c-warn) !important; }
+        .text-danger { color: var(--c-danger) !important; }
+
+        /* ---- Severity chips: tinted, no glow ---- */
+        .badge {
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-weight: 500;
+            font-size: .68rem;
+            letter-spacing: .06em;
+            padding: .3em .55em;
+        }
+        .badge.fs-6 { font-size: .78rem !important; }
+        .badge.bg-danger    { background: rgba(242, 85, 90, .14) !important;  color: var(--c-danger); }
+        .badge.bg-warning   { background: rgba(224, 168, 62, .14) !important; color: var(--c-warn); }
+        .badge.bg-success   { background: rgba(61, 214, 140, .14) !important; color: var(--c-ok); }
+        .badge.bg-info      { background: rgba(98, 249, 250, .12) !important; color: var(--c-info); }
+        .badge.bg-secondary { background: rgba(138, 152, 163, .14) !important; color: var(--c-unknown); }
+        .blockquote-footer { color: var(--dim); }
+
+        .alert { border-radius: 4px; font-size: .85rem; }
+        .alert-success { background: rgba(61, 214, 140, .08);  border: 1px solid rgba(61, 214, 140, .4);  color: var(--c-ok); }
+        .alert-danger  { background: rgba(242, 85, 90, .08);   border: 1px solid rgba(242, 85, 90, .4);   color: var(--c-danger); }
+        .alert-warning { background: rgba(224, 168, 62, .08);  border: 1px solid rgba(224, 168, 62, .4);  color: var(--c-warn); }
+        .spinner-border { color: var(--accent); }
+
+        /* ---- Pipeline ---- */
+        .pipeline { list-style: none; margin: 0; padding: 0; }
+        .pipeline li {
+            display: flex;
+            gap: .9rem;
+            padding: .7rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .pipeline li:last-child { border-bottom: 0; padding-bottom: 0; }
+        .pipeline li:first-child { padding-top: 0; }
+        .pipeline .step-no {
+            font-family: var(--font-mono);
+            font-size: .75rem;
+            color: var(--dim);
+            min-width: 1.6rem;
+            padding-top: .2rem;
+        }
+        .pipeline .step-body strong { display: block; font-weight: 500; font-size: .9rem; }
+        .pipeline .step-body span { color: var(--dim); font-size: .85rem; }
+
+        @media (max-width: 575.98px) {
+            .panel { padding: 1.25rem; }
+            .session .session-label { display: none; }
         }
     </style>
 </head>
-<body>
-<!-- Navigation Bar -->
-<nav class="navbar navbar-dark">
-    <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
-                🏛️ Regulatory Compliance Checker
-            </span>
-        <div class="d-flex align-items-center">
-                <span class="text-white me-3">
-                    Welcome, <strong sec:authentication="name">User</strong>
-                </span>
-            <form th:action="@{/logout}" method="post" class="d-inline">
-                <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
-            </form>
-        </div>
-    </div>
-</nav>
+<body data-bs-theme="dark">
 
-<div class="container main-container">
+<header class="topbar">
+    <div class="brand">
+        <span class="mark"></span>
+        <span>Compliance Checker</span>
+        <span class="sub d-none d-sm-inline">FINMA · Solvency II · Solvency UK</span>
+    </div>
+    <div class="session">
+        <span><span class="session-label">Signed in as </span><strong sec:authentication="name">user</strong></span>
+        <form th:action="@{/logout}" method="post" class="d-inline m-0">
+            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+        </form>
+    </div>
+</header>
+
+<main class="container shell">
     <div class="row">
         <div class="col-lg-8 mx-auto">
-            <div class="upload-card">
-                <h2 class="mb-4">Upload Policy Document</h2>
-                <p class="text-muted">
-                    Upload your insurance policy PDF (max 10 MB) to check compliance
-                    against FINMA, Solvency II, and Solvency UK regulations.
+
+            <!-- Upload -->
+            <section class="panel">
+                <div class="eyebrow">Policy analysis</div>
+                <h2 class="h5 mb-2">Upload policy document</h2>
+                <p class="lead-dim mb-4">
+                    Upload an insurance policy PDF (max 10&nbsp;MB) to check it against FINMA,
+                    Solvency&nbsp;II, and Solvency&nbsp;UK regulations. Analysis runs locally —
+                    the document does not leave this machine.
                 </p>
 
-                <!-- Upload Form (will be enhanced with drag-drop and SSE later) -->
                 <form id="uploadForm" enctype="multipart/form-data">
                     <div class="upload-zone" id="uploadZone">
-                        <div class="upload-icon mb-3">
-                            <svg width="64" height="64" fill="#667eea" viewBox="0 0 16 16">
-                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-                            </svg>
-                        </div>
-                        <h5>Drag & Drop your PDF here</h5>
-                        <p class="text-muted mb-3">or</p>
+                        <div class="doc-icon" aria-hidden="true"></div>
+                        <h5>Drop a PDF here, or browse</h5>
+                        <p class="hint mb-3">PDF · up to 10 MB</p>
                         <input type="file" id="fileInput" name="file" accept="application/pdf"
                                style="display: none;" required>
                         <button type="button" class="btn btn-primary"
                                 onclick="document.getElementById('fileInput').click()">
-                            Browse Files
+                            Browse files
                         </button>
-                        <p class="text-muted mt-3 small">Maximum file size: 10 MB</p>
                     </div>
 
-                    <div id="fileName" class="mt-3 text-center" style="display: none;">
-                        <strong>Selected file:</strong> <span id="fileNameText"></span>
+                    <div id="fileName" class="mt-3 text-center file-readout" style="display: none;">
+                        Selected: <span id="fileNameText"></span>
                     </div>
 
                     <div class="mt-3">
@@ -105,31 +339,34 @@
 
                     <div class="d-grid gap-2 mt-4">
                         <button type="submit" class="btn btn-success btn-lg" id="submitBtn" disabled>
-                            Analyze Document
+                            Analyze document
                         </button>
                     </div>
                 </form>
-            </div>
+            </section>
 
-            <!-- Analysis Progress Panel (hidden until upload starts) -->
-            <div class="card mt-4 border-0 shadow-sm" id="analysisProgressCard" style="display: none;">
+            <!-- Progress (hidden until upload starts) -->
+            <div class="card mt-4" id="analysisProgressCard" style="display: none;">
                 <div class="card-body">
-                    <h5 class="card-title">Analysis in progress</h5>
-                    <p class="text-muted mb-2" id="analysisProgressMessage">Preparing…</p>
-                    <div class="progress" style="height: 1.5rem;">
+                    <div class="eyebrow">Analysis in progress</div>
+                    <p class="mb-2" id="analysisProgressMessage">Preparing…</p>
+                    <div class="progress" style="height: 1.25rem;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" id="analysisProgressBar"
                              role="progressbar" style="width: 0%;">0%
                         </div>
                     </div>
-                    <small class="text-muted mt-2 d-block" id="analysisProgressDetail"></small>
+                    <small class="mt-2 d-block" id="analysisProgressDetail"></small>
                 </div>
             </div>
 
-            <!-- Analysis Results Panel (hidden until completion) -->
-            <div class="card mt-4 border-0 shadow-sm" id="analysisResultsCard" style="display: none;">
+            <!-- Results (hidden until completion) -->
+            <div class="card mt-4" id="analysisResultsCard" style="display: none;">
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h5 class="card-title mb-0">Analysis Results</h5>
+                        <div>
+                            <div class="eyebrow mb-1">Report</div>
+                            <h5 class="card-title mb-0">Findings</h5>
+                        </div>
                         <span class="badge fs-6" id="aggregateRiskBadge"></span>
                     </div>
                     <p class="text-muted" id="analysisSummary"></p>
@@ -137,57 +374,71 @@
                 </div>
             </div>
 
-            <!-- Analysis Error Panel (hidden until failure) -->
-            <div class="card mt-4 border-0 shadow-sm border-danger" id="analysisErrorCard" style="display: none;">
+            <!-- Error (hidden until failure) -->
+            <div class="card mt-4 border-danger" id="analysisErrorCard" style="display: none;">
                 <div class="card-body">
                     <h5 class="card-title text-danger">Analysis failed</h5>
                     <p class="mb-0" id="analysisErrorMessage"></p>
                 </div>
             </div>
 
-            <!-- Info Card -->
-            <div class="card mt-4 border-0 shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">How it works</h5>
-                    <ol>
-                        <li>Upload your insurance policy PDF document</li>
-                        <li>Our AI system analyzes it against regulatory requirements</li>
-                        <li>Receive detailed compliance violations with exact regulatory citations</li>
-                        <li>Review results and take corrective actions</li>
-                    </ol>
-                </div>
-            </div>
+            <!-- Pipeline -->
+            <section class="panel mt-4">
+                <div class="eyebrow">How it works</div>
+                <ol class="pipeline mt-3">
+                    <li>
+                        <span class="step-no">1</span>
+                        <span class="step-body"><strong>Extract</strong>
+                        <span>Text is pulled from the PDF and split into policy sections.</span></span>
+                    </li>
+                    <li>
+                        <span class="step-no">2</span>
+                        <span class="step-body"><strong>Retrieve</strong>
+                        <span>Each section is matched against the regulatory knowledge base by semantic similarity.</span></span>
+                    </li>
+                    <li>
+                        <span class="step-no">3</span>
+                        <span class="step-body"><strong>Analyze</strong>
+                        <span>A local language model compares the section with the retrieved regulations and flags conflicts.</span></span>
+                    </li>
+                    <li>
+                        <span class="step-no">4</span>
+                        <span class="step-body"><strong>Report</strong>
+                        <span>Violations stream in live, with severity and exact regulatory citations.</span></span>
+                    </li>
+                </ol>
+            </section>
 
-            <!-- URL Ingestion Card -->
-            <div class="upload-card mt-4">
-                <h2 class="mb-4">Ingest Regulatory Document from URL</h2>
-                <p class="text-muted">
-                    Provide a direct URL to a regulatory PDF document (e.g., from FINMA, Solvency II)
-                    to add it to the compliance knowledge base.
+            <!-- Knowledge base -->
+            <section class="panel mt-4">
+                <div class="eyebrow">Knowledge base</div>
+                <h2 class="h5 mb-2">Ingest regulatory document</h2>
+                <p class="lead-dim mb-3">
+                    Add a regulatory PDF to the knowledge base by URL. Accepted sources:
+                    FINMA, Fedlex, EUR-Lex, EIOPA, Bank of England, legislation.gov.uk.
                 </p>
                 <form id="urlIngestForm">
                     <div class="input-group">
                         <input type="url" class="form-control form-control-lg" id="pdfUrlInput"
-                               placeholder="https://www.finma.ch/.../document.pdf" required>
+                               placeholder="https://www.finma.ch/…" required>
                         <button type="submit" class="btn btn-primary btn-lg" id="ingestBtn">
                             Ingest
                         </button>
                     </div>
-                    <small class="text-muted mt-1 d-block">URL must point to a PDF file</small>
                 </form>
                 <div id="ingestStatus" class="mt-3" style="display: none;">
                     <div class="alert" id="ingestAlert" role="alert"></div>
                 </div>
                 <div id="ingestProgress" class="mt-3" style="display: none;">
-                    <div class="d-flex align-items-center">
-                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                        <span>Downloading and processing document...</span>
+                    <div class="d-flex align-items-center" style="font-size: .85rem;">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <span>Downloading and processing document…</span>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
-</div>
+</main>
 
 <script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
 <script>
@@ -506,7 +757,7 @@
                 : '<p class="text-muted mb-0">No violations detected for this section.</p>')
             : violations.map(v => `
                 <div class="border-start border-3 ps-3 mb-3"
-                     style="border-color: ${v.severity === 'HIGH' ? '#dc3545' : v.severity === 'MEDIUM' ? '#ffc107' : '#0dcaf0'} !important;">
+                     style="border-color: ${v.severity === 'HIGH' ? 'var(--c-danger)' : v.severity === 'MEDIUM' ? 'var(--c-warn)' : v.severity === 'UNKNOWN' ? 'var(--c-unknown)' : 'var(--c-info)'} !important;">
                     <span class="badge ${severityBadgeClass(v.severity)} mb-1">${escapeHtml(v.severity)}</span>
                     <div><strong>Source:</strong> ${escapeHtml(v.source || '—')}</div>
                     <blockquote class="blockquote-footer mt-2 mb-1">${escapeHtml(v.regulatoryText)}</blockquote>
