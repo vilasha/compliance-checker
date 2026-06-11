@@ -135,7 +135,7 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
         try {
             JsonNode root = objectMapper.readTree(extracted);
             List<PerspectiveViolation> violations = parseViolations(root.path("violations"));
-            OverallRisk risk = parseRisk(root.path("overallRisk").asText("LOW"));
+            OverallRisk risk = parseRisk(root.path("overallRisk").asText(""));
             String recommendation = root.path("recommendation").asText("");
 
             return Optional.of(ComplianceAnalysisResult.builder()
@@ -189,11 +189,14 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
         return result;
     }
 
+    // Both parsers fail toward UNKNOWN, never LOW: a severity the LLM made up
+    // (or omitted) means "we don't know", and in a compliance report "we don't
+    // know" must not be rendered as "no concern".
     private Severity parseSeverity(String value) {
         try {
             return Severity.valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Severity.LOW;
+            return Severity.UNKNOWN;
         }
     }
 
@@ -201,7 +204,7 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
         try {
             return OverallRisk.valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            return OverallRisk.LOW;
+            return OverallRisk.UNKNOWN;
         }
     }
 
@@ -242,7 +245,7 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
         return ComplianceAnalysisResult.builder()
                 .policySection(policyText)
                 .violations(List.of())
-                .overallRisk(OverallRisk.LOW)
+                .overallRisk(OverallRisk.UNKNOWN)
                 .recommendation("LLM response could not be parsed as JSON after " + totalAttempts
                         + " attempts. Manual review required.")
                 .processingTimeMs(elapsedMs)
@@ -253,7 +256,7 @@ public class SingleQueryRagServiceImpl implements SingleQueryRagService {
         return ComplianceAnalysisResult.builder()
                 .policySection(policyText)
                 .violations(List.of())
-                .overallRisk(OverallRisk.LOW)
+                .overallRisk(OverallRisk.UNKNOWN)
                 .recommendation("Compliance analysis failed (" + e.getClass().getSimpleName()
                         + ") " + e.getMessage())
                 .processingTimeMs(elapsedMs)

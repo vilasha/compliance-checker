@@ -4,6 +4,7 @@ import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import dev.langchain4j.store.embedding.CosineSimilarity;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * sentence-transformer style models tend to score "unrelated" pairs higher than
  * 0 — what matters is the gap, not the absolute number.
  */
+@Disabled("turn on when needed. I wrote it to illustrate the case in an article")
 class BgeM3EmbeddingDemoTest {
 
     private static final String OLLAMA_BASE_URL =

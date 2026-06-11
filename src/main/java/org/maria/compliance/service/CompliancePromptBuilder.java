@@ -38,7 +38,8 @@ public class CompliancePromptBuilder {
     public String buildCompliancePrompt(String policyText, String language, List<ScoredRegulatoryChunk> chunks) {
         StringBuilder sb = new StringBuilder(8192);
 
-        sb.append("You are a regulatory compliance analyst reviewing an insurance policy section ")
+        sb.append("Respond with a single JSON object only — the exact schema is given at the end of this prompt.\n\n")
+                .append("You are a regulatory compliance analyst reviewing an insurance policy section ")
                 .append("against Swiss and EU insurance/reinsurance regulations.\n\n")
                 .append("# Regulatory Context\n\n")
                 .append("Below are excerpts from official regulatory documents retrieved by semantic search. ")

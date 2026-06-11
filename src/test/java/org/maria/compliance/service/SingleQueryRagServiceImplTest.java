@@ -137,8 +137,10 @@ class SingleQueryRagServiceImplTest {
 
         ComplianceAnalysisResult result = service.analyze("Policy text", "de");
 
+        // UNKNOWN, not LOW: exhausted parse retries mean "could not analyze",
+        // which must never aggregate as "no concern" in the report.
         assertThat(result.violations()).isEmpty();
-        assertThat(result.overallRisk()).isEqualTo(OverallRisk.LOW);
+        assertThat(result.overallRisk()).isEqualTo(OverallRisk.UNKNOWN);
         assertThat(result.recommendation())
                 .contains("could not be parsed as JSON")
                 .contains(String.valueOf(1 + PARSE_RETRY_MAX));
@@ -185,7 +187,7 @@ class SingleQueryRagServiceImplTest {
         ComplianceAnalysisResult result = service.analyze("Policy text", "de");
 
         assertThat(result.violations()).isEmpty();
-        assertThat(result.overallRisk()).isEqualTo(OverallRisk.LOW);
+        assertThat(result.overallRisk()).isEqualTo(OverallRisk.UNKNOWN);
         assertThat(result.recommendation()).contains("Compliance analysis failed");
         verify(chatModel, never()).chat(anyString());
     }

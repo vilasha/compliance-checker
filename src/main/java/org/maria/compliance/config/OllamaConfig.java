@@ -1,5 +1,7 @@
 package org.maria.compliance.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
@@ -39,12 +41,22 @@ public class OllamaConfig {
     @Value("${compliance.ollama.max-retries:3}")
     private int maxRetries;
 
+    // Ollama's default context window is small (4096 tokens for most models). The
+    // compliance prompt is regulatory chunks + the policy section + rules + schema,
+    // which easily exceeds that — and Ollama truncates silently, so the model never
+    // sees part of the prompt and returns malformed or context-free answers. This was
+    // a likely contributor to the JSON parse retries ADR-005 was written around.
+    // qwen2.5 supports 32k; 16k balances coverage against KV-cache memory on CPU.
+    @Value("${compliance.ollama.num-ctx:16384}")
+    private int numCtx;
+
     @Bean
     public ChatModel chatModel() {
         return OllamaChatModel.builder()
                 .baseUrl(baseUrl)
                 .modelName(chatModelName)
                 .temperature(0.0)
+                .numCtx(numCtx)
                 .timeout(timeout)
                 .maxRetries(maxRetries)
                 .build();
@@ -56,6 +68,7 @@ public class OllamaConfig {
                 .baseUrl(baseUrl)
                 .modelName(chatModelName)
                 .temperature(0.0)
+                .numCtx(numCtx)
                 .timeout(timeout)
                 .build();
     }
@@ -71,17 +84,18 @@ public class OllamaConfig {
     }
 
     @Bean
-    public ApplicationRunner ollamaModelEnsureRunner() {
+    public ApplicationRunner ollamaModelEnsureRunner(ObjectMapper objectMapper) {
         return args -> {
             HttpClient httpClient = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(30))
                     .build();
-            ensureModelAvailable(httpClient, embeddingModelName);
-            ensureModelAvailable(httpClient, chatModelName);
+            ensureModelAvailable(httpClient, objectMapper, embeddingModelName);
+            ensureModelAvailable(httpClient, objectMapper, chatModelName);
         };
     }
 
-    private void ensureModelAvailable(HttpClient httpClient, String modelName) throws Exception {
+    private void ensureModelAvailable(HttpClient httpClient, ObjectMapper objectMapper,
+                                      String modelName) throws Exception {
         HttpRequest tagsRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/api/tags"))
                 .timeout(Duration.ofSeconds(10))
@@ -89,9 +103,8 @@ public class OllamaConfig {
                 .build();
 
         String tagsBody = httpClient.send(tagsRequest, HttpResponse.BodyHandlers.ofString()).body();
-        String baseName = modelName.contains(":") ? modelName.split(":")[0] : modelName;
 
-        if (tagsBody.contains("\"" + baseName)) {
+        if (isInstalled(objectMapper, tagsBody, modelName)) {
             log.info("Ollama model available: {}", modelName);
             return;
         }
@@ -114,5 +127,21 @@ public class OllamaConfig {
         }
 
         log.info("Ollama model '{}' pulled successfully.", modelName);
+    }
+
+    private boolean isInstalled(ObjectMapper objectMapper, String tagsBody, String modelName) {
+        String wanted = modelName.contains(":") ? modelName : modelName + ":latest";
+        try {
+            JsonNode models = objectMapper.readTree(tagsBody).path("models");
+            for (JsonNode model : models) {
+                if (wanted.equals(model.path("name").asText())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not parse Ollama /api/tags response, assuming model '{}' is missing: {}",
+                    modelName, e.getMessage());
+        }
+        return false;
     }
 }

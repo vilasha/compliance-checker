@@ -1,12 +1,16 @@
 package org.maria.compliance.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.maria.compliance.model.TaskEvent;
 import org.maria.compliance.model.TaskEventType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +23,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * so a client that connects after some events have fired still receives them
  * (replay-on-late-subscribe)
  *
+ * <p>History is a Caffeine cache with time-based eviction, not a plain map: every
+ * COMPLETED event carries the full {@code PolicyAnalysisReport}, so an unbounded map
+ * grows by one full report per upload for the lifetime of the JVM. Eviction is safe
+ * by design — StatusController already rehydrates a terminal event from the
+ * persisted {@code user_uploads} row when no in-memory history exists
+ *
  * <p>Single-instance deployments only. Multi-instance would need a shared broker
  * (Redis pub/sub, Kafka) — out of scope for now
  */
@@ -26,17 +36,24 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class TaskEventBus {
 
-    private final Map<String, List<TaskEvent>> history = new ConcurrentHashMap<>();
+    private final Cache<String, List<TaskEvent>> history;
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
+
+    public TaskEventBus(
+            @Value("${compliance.processing.event-history-retention:1h}") Duration historyRetention) {
+        this.history = Caffeine.newBuilder()
+                .expireAfterWrite(historyRetention)
+                .build();
+    }
 
     /**
      * Append the event to the task's history and broadcast it to every active emitter
      * subscribed to the task. If the event is terminal, all emitters are completed
-     * after delivery.
+     * after delivery and the task's emitter registration is released.
      */
     public void publish(TaskEvent event) {
         String taskId = event.taskId();
-        history.computeIfAbsent(taskId, k -> new CopyOnWriteArrayList<>()).add(event);
+        history.get(taskId, k -> new CopyOnWriteArrayList<>()).add(event);
 
         List<SseEmitter> taskEmitters = emitters.get(taskId);
         if (taskEmitters != null) {
@@ -47,6 +64,7 @@ public class TaskEventBus {
                 for (SseEmitter emitter : taskEmitters) {
                     safeComplete(emitter);
                 }
+                emitters.remove(taskId);
             }
         }
     }
@@ -62,7 +80,7 @@ public class TaskEventBus {
         emitter.onTimeout(() -> removeEmitter(taskId, emitter));
         emitter.onError(t -> removeEmitter(taskId, emitter));
 
-        List<TaskEvent> past = history.get(taskId);
+        List<TaskEvent> past = history.getIfPresent(taskId);
         if (past == null || past.isEmpty()) {
             return;
         }
@@ -81,7 +99,7 @@ public class TaskEventBus {
      * distinguish "unknown task" (404) from "known task with no events yet"
      */
     public boolean hasHistory(String taskId) {
-        List<TaskEvent> past = history.get(taskId);
+        List<TaskEvent> past = history.getIfPresent(taskId);
         return past != null && !past.isEmpty();
     }
 
@@ -89,7 +107,7 @@ public class TaskEventBus {
      * Read-only view of the recorded events for a task
      */
     public List<TaskEvent> historyFor(String taskId) {
-        List<TaskEvent> past = history.get(taskId);
+        List<TaskEvent> past = history.getIfPresent(taskId);
         return past == null ? List.of() : Collections.unmodifiableList(past);
     }
 
@@ -113,10 +131,10 @@ public class TaskEventBus {
     }
 
     private void removeEmitter(String taskId, SseEmitter emitter) {
-        List<SseEmitter> list = emitters.get(taskId);
-        if (list != null) {
+        emitters.computeIfPresent(taskId, (k, list) -> {
             list.remove(emitter);
-        }
+            return list.isEmpty() ? null : list;
+        });
     }
 
     private boolean isTerminal(TaskEventType type) {

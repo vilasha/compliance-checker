@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Compliance Checker</title>
-    <link th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}" rel="stylesheet">
+    <link th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}" rel="stylesheet">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -47,6 +47,10 @@
         You have been logged out.
     </div>
 
+    <div th:if="${param.expired}" class="alert alert-warning">
+        Your session has expired. Please log in again.
+    </div>
+
     <form th:action="@{/login}" method="post">
         <div class="mb-3">
             <label for="username" class="form-label">Username</label>
@@ -70,6 +74,6 @@
     </div>
 </div>
 
-<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
 </body>
 </html>
