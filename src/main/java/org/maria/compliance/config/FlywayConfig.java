@@ -2,6 +2,7 @@ package org.maria.compliance.config;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -10,11 +11,14 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 
 import javax.sql.DataSource;
-import java.util.Arrays;
+import java.util.List;
 
+@Slf4j
 @Configuration
 @Profile("!test")
 public class FlywayConfig {
+
+    private static final List<String> SCHEMA_PROFILES = List.of("dev", "train", "prod");
 
     private final Environment environment;
 
@@ -31,16 +35,19 @@ public class FlywayConfig {
         this.environment = environment;
     }
 
+    /**
+     * Scans ALL active profiles for a schema-mapped one, not just the first
+     * Profile activation order is caller-controlled: "scrape,prod" used to resolve
+     * to the dev schema because index 0 was "scrape" — a scrape run intended for
+     * prod would silently ingest into dev
+     */
     private String getSchemaName() {
-        String[] activeProfiles = environment.getActiveProfiles();
-
-        if (activeProfiles.length == 0) {
-            return "dev";
+        for (String profile : environment.getActiveProfiles()) {
+            if (SCHEMA_PROFILES.contains(profile)) {
+                return profile;
+            }
         }
-
-        String profile = activeProfiles[0];
-
-        return Arrays.asList("dev", "train", "prod").contains(profile) ? profile : "dev";
+        return "dev";
     }
 
     @Bean
@@ -67,10 +74,8 @@ public class FlywayConfig {
     public Flyway flyway(DataSource dataSource) {
         String schemaName = getSchemaName();
 
-        System.out.println("===========================================");
-        System.out.println("Flyway: Active Profile=" + String.join(",", environment.getActiveProfiles())
-                + " Schema=" + schemaName);
-        System.out.println("===========================================");
+        log.info("Flyway: activeProfiles={} schema={}",
+                String.join(",", environment.getActiveProfiles()), schemaName);
 
         return Flyway.configure()
                 .dataSource(dataSource)

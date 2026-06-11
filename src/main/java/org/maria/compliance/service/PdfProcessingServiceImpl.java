@@ -33,32 +33,37 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
     @Value("${compliance.rag.chunk-overlap:256}")
     private int defaultChunkOverlap;
 
+    // MultipartFile overloads delegate to the byte[] ones — single implementation,
+    // single place to fix extraction bugs.
     @Override
     public String extractText(MultipartFile file) {
-        try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+        try {
+            return extractText(file.getBytes(), file.getOriginalFilename());
+        } catch (IOException e) {
+            throw new PdfProcessingException(
+                    "Failed to read uploaded file: " + file.getOriginalFilename(), e);
+        }
+    }
+
+    @Override
+    public String extractText(byte[] pdfContent, String fileName) {
+        try (PDDocument document = Loader.loadPDF(pdfContent)) {
             PDFTextStripper stripper = new PDFTextStripper();
             String text = stripper.getText(document);
-            log.debug("Extracted {} characters from PDF: {}", text.length(), file.getOriginalFilename());
+            log.debug("Extracted {} characters from PDF: {}", text.length(), fileName);
             return text;
         } catch (IOException e) {
-            log.error("Failed to extract text from PDF: {}", file.getOriginalFilename(), e);
-            throw new PdfProcessingException("Failed to extract text from PDF: " + file.getOriginalFilename(), e);
+            log.error("Failed to extract text from PDF: {}", fileName, e);
+            throw new PdfProcessingException("Failed to extract text from PDF: " + fileName, e);
         }
     }
 
     @Override
     public List<PolicySection> detectSections(String text) {
         if (!sectionDetectionEnabled) {
-            return List.of(PolicySection.builder()
-                    .sectionNumber(1)
-                    .heading("Full Document")
-                    .content(text)
-                    .startPosition(0)
-                    .endPosition(text.length())
-                    .build());
+            return List.of(fullDocumentSection(text));
         }
 
-        List<PolicySection> sections = new ArrayList<>();
         Pattern pattern = Pattern.compile(headingPatterns, Pattern.MULTILINE);
         Matcher matcher = pattern.matcher(text);
 
@@ -73,15 +78,10 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
         }
 
         if (sectionStarts.isEmpty()) {
-            return List.of(PolicySection.builder()
-                    .sectionNumber(1)
-                    .heading("Full Document")
-                    .content(text)
-                    .startPosition(0)
-                    .endPosition(text.length())
-                    .build());
+            return List.of(fullDocumentSection(text));
         }
 
+        List<PolicySection> sections = new ArrayList<>(sectionStarts.size());
         for (int i = 0; i < sectionStarts.size(); i++) {
             int start = sectionStarts.get(i);
             int end = (i < sectionStarts.size() - 1) ? sectionStarts.get(i + 1) : text.length();
@@ -143,46 +143,11 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
 
     @Override
     public List<ChunkResult> processAndChunk(MultipartFile file) {
-        String text = extractText(file);
-        List<PolicySection> sections = detectSections(text);
-
-        List<ChunkResult> allChunks = new ArrayList<>();
-
-        for (PolicySection section : sections) {
-            List<ChunkResult> sectionChunks = chunkText(
-                    section.content(),
-                    defaultChunkSize,
-                    defaultChunkOverlap
-            );
-
-            sectionChunks = sectionChunks.stream()
-                    .map(chunk -> ChunkResult.builder()
-                            .text(chunk.text())
-                            .chunkIndex(allChunks.size())
-                            .sectionHeading(section.heading())
-                            .startPosition(chunk.startPosition())
-                            .endPosition(chunk.endPosition())
-                            .build())
-                    .toList();
-
-            allChunks.addAll(sectionChunks);
-        }
-
-        log.info("Processed PDF '{}': {} sections, {} chunks",
-                file.getOriginalFilename(), sections.size(), allChunks.size());
-        return allChunks;
-    }
-
-    @Override
-    public String extractText(byte[] pdfContent, String fileName) {
-        try (PDDocument document = Loader.loadPDF(pdfContent)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String text = stripper.getText(document);
-            log.debug("Extracted {} characters from PDF: {}", text.length(), fileName);
-            return text;
+        try {
+            return processAndChunk(file.getBytes(), file.getOriginalFilename());
         } catch (IOException e) {
-            log.error("Failed to extract text from PDF: {}", fileName, e);
-            throw new PdfProcessingException("Failed to extract text from PDF: " + fileName, e);
+            throw new PdfProcessingException(
+                    "Failed to read uploaded file: " + file.getOriginalFilename(), e);
         }
     }
 
@@ -200,20 +165,31 @@ public class PdfProcessingServiceImpl implements PdfProcessingService {
                     defaultChunkOverlap
             );
 
-            sectionChunks = sectionChunks.stream()
-                    .map(chunk -> ChunkResult.builder()
-                            .text(chunk.text())
-                            .chunkIndex(allChunks.size())
-                            .sectionHeading(section.heading())
-                            .startPosition(chunk.startPosition())
-                            .endPosition(chunk.endPosition())
-                            .build())
-                    .toList();
-
-            allChunks.addAll(sectionChunks);
+            // Explicit loop instead of a stream: the previous version captured
+            // allChunks.size() lazily inside a .map(), so every chunk of a section
+            // received the same index (the list size *before* the section was added).
+            for (ChunkResult chunk : sectionChunks) {
+                allChunks.add(ChunkResult.builder()
+                        .text(chunk.text())
+                        .chunkIndex(allChunks.size())
+                        .sectionHeading(section.heading())
+                        .startPosition(chunk.startPosition())
+                        .endPosition(chunk.endPosition())
+                        .build());
+            }
         }
 
         log.info("Processed PDF '{}': {} sections, {} chunks", fileName, sections.size(), allChunks.size());
         return allChunks;
+    }
+
+    private PolicySection fullDocumentSection(String text) {
+        return PolicySection.builder()
+                .sectionNumber(1)
+                .heading("Full Document")
+                .content(text)
+                .startPosition(0)
+                .endPosition(text.length())
+                .build();
     }
 }

@@ -5,6 +5,7 @@ import org.maria.compliance.model.TaskEvent;
 import org.maria.compliance.model.TaskEventType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -13,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TaskEventBusTest {
 
-    private final TaskEventBus bus = new TaskEventBus();
+    private final TaskEventBus bus = new TaskEventBus(Duration.ofHours(1));
 
     @Test
     void publish_storesEventInHistory() {

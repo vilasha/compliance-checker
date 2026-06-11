@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.maria.compliance.model.*;
 import org.maria.compliance.repository.UserUploadRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -24,22 +25,32 @@ import java.util.List;
 @Slf4j
 public class AsyncAnalysisWorker {
 
+    // Overlap between parts of a split section, so a clause straddling the cut
+    // is fully visible in at least one part instead of being analyzed half-blind.
+    private static final int SPLIT_OVERLAP_CHARS = 200;
+
     private final PdfProcessingService pdfProcessingService;
     private final SingleQueryRagService ragService;
     private final TaskEventBus eventBus;
     private final UserUploadRepository uploadRepository;
     private final ObjectMapper objectMapper;
+    private final int maxPolicySections;
+    private final int maxSectionChars;
 
     public AsyncAnalysisWorker(PdfProcessingService pdfProcessingService,
                                SingleQueryRagService ragService,
                                TaskEventBus eventBus,
                                UserUploadRepository uploadRepository,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               @Value("${compliance.rag.max-policy-sections:50}") int maxPolicySections,
+                               @Value("${compliance.rag.max-section-chars:6000}") int maxSectionChars) {
         this.pdfProcessingService = pdfProcessingService;
         this.ragService = ragService;
         this.eventBus = eventBus;
         this.uploadRepository = uploadRepository;
         this.objectMapper = objectMapper;
+        this.maxPolicySections = maxPolicySections;
+        this.maxSectionChars = maxSectionChars;
     }
 
     @Async("taskExecutor")
@@ -56,14 +67,15 @@ public class AsyncAnalysisWorker {
                     .build());
 
             String text = pdfProcessingService.extractText(pdfBytes, fileName);
-            List<PolicySection> sections = pdfProcessingService.detectSections(text);
+            List<PolicySection> detected = pdfProcessingService.detectSections(text);
+            List<PolicySection> sections = prepareSections(detected);
             int total = sections.size();
 
             eventBus.publish(TaskEvent.builder()
                     .taskId(taskId)
                     .type(TaskEventType.SECTIONS_DETECTED)
                     .timestamp(Instant.now())
-                    .message("Detected " + total + " section(s)")
+                    .message(sectionsDetectedMessage(detected.size(), total))
                     .sectionsTotal(total)
                     .build());
 
@@ -125,12 +137,73 @@ public class AsyncAnalysisWorker {
         }
     }
 
+    /**
+     * Enforces the two size limits that protect the LLM pipeline:
+     * <ul>
+     *   <li>{@code max-policy-sections} caps the number of analysis units, bounding
+     *       total runtime (previously configured but enforced nowhere);</li>
+     *   <li>{@code max-section-chars} splits oversized sections — when heading detection
+     *       finds nothing, "one section" is the whole document, which silently blows the
+     *       embedding-query and chat-context budgets. Splitting keeps full coverage,
+     *       unlike truncation, which a compliance tool must never do silently.</li>
+     * </ul>
+     */
+    private List<PolicySection> prepareSections(List<PolicySection> detected) {
+        List<PolicySection> capped = detected.size() > maxPolicySections
+                ? detected.subList(0, maxPolicySections)
+                : detected;
+
+        List<PolicySection> prepared = new ArrayList<>(capped.size());
+        for (PolicySection section : capped) {
+            if (section.content() == null || section.content().length() <= maxSectionChars) {
+                prepared.add(renumbered(section, prepared.size() + 1));
+                continue;
+            }
+            List<ChunkResult> parts = pdfProcessingService.chunkText(
+                    section.content(), maxSectionChars, SPLIT_OVERLAP_CHARS);
+            for (int p = 0; p < parts.size(); p++) {
+                ChunkResult part = parts.get(p);
+                prepared.add(PolicySection.builder()
+                        .sectionNumber(prepared.size() + 1)
+                        .heading(section.heading() + " (part " + (p + 1) + "/" + parts.size() + ")")
+                        .content(part.text())
+                        .startPosition(section.startPosition() + part.startPosition())
+                        .endPosition(section.startPosition() + part.endPosition())
+                        .build());
+            }
+        }
+        return prepared;
+    }
+
+    private PolicySection renumbered(PolicySection section, int number) {
+        return PolicySection.builder()
+                .sectionNumber(number)
+                .heading(section.heading())
+                .content(section.content())
+                .startPosition(section.startPosition())
+                .endPosition(section.endPosition())
+                .build();
+    }
+
+    private String sectionsDetectedMessage(int detectedCount, int preparedCount) {
+        if (detectedCount == preparedCount) {
+            return "Detected " + detectedCount + " section(s)";
+        }
+        if (detectedCount > maxPolicySections) {
+            return "Detected " + detectedCount + " section(s), analyzing the first "
+                    + maxPolicySections + " (max-policy-sections limit)";
+        }
+        return "Detected " + detectedCount + " section(s), split into "
+                + preparedCount + " analysis unit(s) due to section length";
+    }
+
     private PolicyAnalysisReport buildReport(String taskId, String fileName, String language,
                                              List<ComplianceAnalysisResult> results, long totalTime) {
         int violationCount = 0;
-        // The OverallRisk enum is declared HIGH, MEDIUM, LOW, so a *smaller* ordinal
-        // means *higher* severity. Start at LOW (least severe) and escalate as we
-        // see worse — comparison is `<`, not `>`.
+        // The OverallRisk enum is declared HIGH, MEDIUM, UNKNOWN, LOW, so a *smaller*
+        // ordinal means *higher* severity. Start at LOW (least severe) and escalate as
+        // we see worse — comparison is `<`, not `>`. UNKNOWN ranks above LOW so that
+        // unanalyzable sections surface in the aggregate instead of reading as "fine".
         OverallRisk aggregate = OverallRisk.LOW;
         for (ComplianceAnalysisResult r : results) {
             violationCount += r.violations() == null ? 0 : r.violations().size();

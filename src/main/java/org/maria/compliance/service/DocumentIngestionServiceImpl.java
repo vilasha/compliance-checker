@@ -146,7 +146,15 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
             throw new IOException("HTTP " + response.statusCode() + " downloading " + url);
         }
 
-        return response.body();
+        byte[] body = response.body();
+
+        // Magic-byte check replaces the old URL-extension check: the URL says nothing
+        // about the payload, and regulators serve PDFs from extensionless CMS routes.
+        if (body.length < 4 || body[0] != '%' || body[1] != 'P' || body[2] != 'D' || body[3] != 'F') {
+            throw new IOException("Downloaded content from " + url + " is not a PDF (missing %PDF header)");
+        }
+
+        return body;
     }
 
     private RegulatoryChunk toRegulatoryChunk(ChunkResult chunk, DocumentSource source, String fileName) {

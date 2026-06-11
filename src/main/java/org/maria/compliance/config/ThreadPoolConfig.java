@@ -1,7 +1,5 @@
 package org.maria.compliance.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +8,14 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.Executor;
 
 /**
- * Configuration for asynchronous task execution.
- * Handles concurrent PDF processing and RAG analysis.
+ * Configuration for asynchronous task execution
+ * Handles concurrent PDF processing and RAG analysis
+ * <p>
+ * Note: no custom ObjectMapper bean here anymore. Declaring one made Boot's Jackson
+ * auto-configuration back off, losing its defaults — most visibly, Instants in SSE
+ * payloads serialized as epoch decimals instead of ISO-8601. Boot registers the
+ * JavaTimeModule automatically (jackson-datatype-jsr310 is on the classpath) and
+ * handles records natively, so the auto-configured mapper is strictly better
  */
 @Configuration
 public class ThreadPoolConfig {
@@ -21,11 +25,6 @@ public class ThreadPoolConfig {
 
     @Value("${compliance.processing.queue-capacity:100}")
     private int queueCapacity;
-
-    @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper().registerModule(new JavaTimeModule());
-    }
 
     @Bean(name = "taskExecutor")
     public Executor taskExecutor() {

@@ -52,15 +52,6 @@ logging:
     org.springframework.security: WARN
     org.springframework.jdbc.core: WARN
     dev.langchain4j: INFO
-    # HtmlUnit (JS errors, CSS parsing, SSL certs)
-    org.htmlunit: ERROR
-    org.htmlunit.javascript: OFF
-    org.htmlunit.css: OFF
-    org.htmlunit.cyberneko: OFF
-    org.htmlunit.WebClient: ERROR
-    # Apache HttpClient (wire/header dumps)
-    org.apache.http: ERROR
-    org.apache.hc: ERROR
     # PDFBox (font metrics, space widths)
     org.apache.pdfbox: WARN
     org.apache.fontbox: WARN
@@ -99,6 +90,11 @@ compliance:
     # surface in reasonable time. If running on GPU, this can be tightened
     timeout: 30m
     max-retries: 3
+    # Context window passed to Ollama (options.num_ctx). Ollama's default is 4096
+    # tokens and it truncates silently — with retrieved chunks + policy section +
+    # rules + schema in one prompt, parts of the prompt simply vanished. 16k fits
+    # the full prompt with headroom; raise toward 32k on GPU if needed
+    num-ctx: 16384
 
   # Embedding Store (PgVectorEmbeddingStore via LangChain4j)
   embedding-store:
@@ -112,7 +108,12 @@ compliance:
     chunk-overlap: 256
     top-k-results: 5
     similarity-threshold: 0.7
+    # Hard cap on analysis units per upload (bounds total runtime)
     max-policy-sections: 50
+    # Sections longer than this are split into overlapping parts before analysis.
+    # Protects the embedding query (bge-m3 truncates past 8k tokens) and the chat
+    # prompt budget when heading detection falls back to "Full Document"
+    max-section-chars: 6000
     # Single-query RAG: max retries on JSON parse failure.
     # Total LLM calls per analysis = 1 + parse-retry-max.
     parse-retry-max: 4
@@ -201,6 +202,12 @@ compliance:
         enabled: true
       - name: Solvency UK
         enabled: true
+    # Hosts the URL-ingestion endpoint may fetch from (subdomains included).
+    # The server downloads these URLs itself, so an open endpoint would let an
+    # authenticated user probe internal addresses through it (SSRF).
+    # Comma-separated on purpose: @Value List<String> injection splits on commas
+    # but cannot bind a YAML list
+    allowed-ingest-hosts: finma.ch,fedlex.admin.ch,eur-lex.europa.eu,eiopa.europa.eu,bankofengland.co.uk,legislation.gov.uk
 
   # FINMA Scraper (activated with --spring.profiles.active=dev,scrape)
   # GUIDs are Sitecore item IDs for document type categories
@@ -230,6 +237,9 @@ compliance:
     # replays history from the in-memory bus, so the practical impact of a too-short
     # value is wasted reconnects, not lost data
     sse-timeout: 1h
+    # How long completed-task event history (incl. full reports) stays in memory.
+    # After eviction, StatusController serves the result from user_uploads instead
+    event-history-retention: 1h
 
   # Security Configuration (Local)
   security:
@@ -246,7 +256,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized
-  metrics:
-    export:
-      prometheus:
+  prometheus:
+    metrics:
+      export:
         enabled: true

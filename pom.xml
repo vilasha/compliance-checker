@@ -38,6 +38,19 @@
 			<artifactId>spring-boot-starter-jdbc</artifactId>
 		</dependency>
 
+		<!-- Actuator: the Docker healthcheck and SecurityConfig both reference
+		     /actuator/health — without this dependency the endpoint 404s and the
+		     app container in `docker compose - -profile full` never turns healthy -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+
 		<!-- Database Migrations -->
 		<dependency>
 			<groupId>org.flywaydb</groupId>
@@ -184,7 +197,7 @@
 			<dependency>
 				<groupId>org.testcontainers</groupId>
 				<artifactId>testcontainers-bom</artifactId>
-				<version>1.19.8</version>
+				<version>1.21.3</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

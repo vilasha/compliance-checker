@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Compliance Checker - Home</title>
-    <link th:href="@{/webjars/bootstrap/5.3.3/css/bootstrap.min.css}" rel="stylesheet">
+    <link th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}" rel="stylesheet">
     <style>
         body {
             background-color: #f8f9fa;
@@ -189,8 +189,32 @@
     </div>
 </div>
 
-<script th:src="@{/webjars/bootstrap/5.3.3/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
 <script>
+    // CSRF double-submit: Spring Security writes the token into the XSRF-TOKEN
+    // cookie (CookieCsrfTokenRepository); we echo it back in the X-XSRF-TOKEN
+    // header on every state-changing call.
+    function csrfToken() {
+        const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    // Central fetch wrapper: attaches the CSRF header and turns 401/403 into a
+    // redirect to the login page. This is what used to surface as an opaque
+    // internal-server-error when uploading from a stale tab after a server
+    // restart — the session was gone but the page never noticed.
+    async function apiFetch(url, options = {}) {
+        const token = csrfToken();
+        options.headers = Object.assign({}, options.headers,
+                token ? { 'X-XSRF-TOKEN': token } : {});
+        const response = await fetch(url, options);
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = '/login?expired';
+            throw new Error('Session expired — redirecting to login.');
+        }
+        return response;
+    }
+
     // Basic file input handling (will be enhanced with SSE later)
     const fileInput = document.getElementById('fileInput');
     const uploadZone = document.getElementById('uploadZone');
@@ -253,7 +277,7 @@
         submitBtn.disabled = true;
 
         try {
-            const response = await fetch('/api/upload', { method: 'POST', body: formData });
+            const response = await apiFetch('/api/upload', { method: 'POST', body: formData });
             if (!response.ok) {
                 const errBody = await response.json().catch(() => ({ error: 'Upload failed' }));
                 throw new Error(errBody.error || 'Upload failed (' + response.status + ')');
@@ -409,12 +433,14 @@
     function riskBadgeClass(risk) {
         return risk === 'HIGH' ? 'bg-danger'
              : risk === 'MEDIUM' ? 'bg-warning text-dark'
+             : risk === 'UNKNOWN' ? 'bg-secondary'
              : 'bg-success';
     }
 
     function severityBadgeClass(severity) {
         return severity === 'HIGH' ? 'bg-danger'
              : severity === 'MEDIUM' ? 'bg-warning text-dark'
+             : severity === 'UNKNOWN' ? 'bg-secondary'
              : 'bg-info text-dark';
     }
 
@@ -513,14 +539,8 @@
         progress.style.display = 'block';
         status.style.display = 'none';
 
-        fetch('/api/ingest/url?url=' + encodeURIComponent(url), { method: 'POST' })
-            .then(response => {
-                if (response.status === 401) {
-                    window.location.href = '/login?expired';
-                    return;
-                }
-                return response.json();
-            })
+        apiFetch('/api/ingest/url?url=' + encodeURIComponent(url), { method: 'POST' })
+            .then(response => response.json())
             .then(result => {
                 if (!result) return;
                 progress.style.display = 'none';

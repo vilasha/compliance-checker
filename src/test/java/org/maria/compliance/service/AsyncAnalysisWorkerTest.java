@@ -29,8 +29,10 @@ class AsyncAnalysisWorkerTest {
         eventBus = mock(TaskEventBus.class);
         uploadRepository = mock(UserUploadRepository.class);
         ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        // 50 / 6000 mirror the production defaults for max-policy-sections and
+        // max-section-chars; test sections are tiny, so the split path stays inert
         worker = new AsyncAnalysisWorker(pdfProcessingService, ragService, eventBus,
-                uploadRepository, objectMapper);
+                uploadRepository, objectMapper, 50, 6000);
     }
 
     @Test
