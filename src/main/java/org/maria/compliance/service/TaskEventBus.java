@@ -2,6 +2,7 @@ package org.maria.compliance.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import lombok.extern.slf4j.Slf4j;
 import org.maria.compliance.model.TaskEvent;
 import org.maria.compliance.model.TaskEventType;
@@ -23,11 +24,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * so a client that connects after some events have fired still receives them
  * (replay-on-late-subscribe)
  *
- * <p>History is a Caffeine cache with time-based eviction, not a plain map: every
+ * <p>History is a Caffeine cache with variable expiry, not a plain map: every
  * COMPLETED event carries the full {@code PolicyAnalysisReport}, so an unbounded map
- * grows by one full report per upload for the lifetime of the JVM. Eviction is safe
- * by design — StatusController already rehydrates a terminal event from the
- * persisted {@code user_uploads} row when no in-memory history exists
+ * grows by one full report per upload for the lifetime of the JVM. Expiry is
+ * state-aware: tasks whose last event is terminal expire after the configured
+ * retention; tasks still running get a long safety TTL instead, because a single
+ * section can sit between SECTION_STARTED and SECTION_ANALYZED for over an hour
+ * (LLM timeout × parse retries) with no events in between — evicting a live task
+ * would make StatusController misreport it to late subscribers as a stale upload
+ * and close their stream before the real events arrive. Evicting *terminal* history
+ * is safe by design: StatusController rehydrates the result from the persisted
+ * {@code user_uploads} row when no in-memory history exists
  *
  * <p>Single-instance deployments only. Multi-instance would need a shared broker
  * (Redis pub/sub, Kafka) — out of scope for now
@@ -36,14 +43,41 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class TaskEventBus {
 
+    // Safety net for tasks that never reach a terminal event (e.g. the async
+    // submission was rejected after UPLOADED was published). Generous on purpose:
+    // it only has to be longer than any legitimate analysis.
+    private static final Duration ACTIVE_TASK_SAFETY_TTL = Duration.ofHours(24);
+
     private final Cache<String, List<TaskEvent>> history;
     private final Map<String, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public TaskEventBus(
             @Value("${compliance.processing.event-history-retention:1h}") Duration historyRetention) {
         this.history = Caffeine.newBuilder()
-                .expireAfterWrite(historyRetention)
+                .expireAfter(new Expiry<String, List<TaskEvent>>() {
+                    @Override
+                    public long expireAfterCreate(String taskId, List<TaskEvent> events, long currentTime) {
+                        return ttlFor(events, historyRetention);
+                    }
+
+                    @Override
+                    public long expireAfterUpdate(String taskId, List<TaskEvent> events,
+                                                  long currentTime, long currentDuration) {
+                        return ttlFor(events, historyRetention);
+                    }
+
+                    @Override
+                    public long expireAfterRead(String taskId, List<TaskEvent> events,
+                                                long currentTime, long currentDuration) {
+                        return currentDuration;
+                    }
+                })
                 .build();
+    }
+
+    private long ttlFor(List<TaskEvent> events, Duration historyRetention) {
+        boolean terminal = !events.isEmpty() && isTerminal(events.get(events.size() - 1).type());
+        return terminal ? historyRetention.toNanos() : ACTIVE_TASK_SAFETY_TTL.toNanos();
     }
 
     /**
@@ -53,7 +87,12 @@ public class TaskEventBus {
      */
     public void publish(TaskEvent event) {
         String taskId = event.taskId();
-        history.get(taskId, k -> new CopyOnWriteArrayList<>()).add(event);
+        List<TaskEvent> events = history.get(taskId, k -> new CopyOnWriteArrayList<>());
+        events.add(event);
+        // Mutating the cached list does NOT count as a cache write — without this
+        // re-put, the expiry clock would run from the task's *first* event and the
+        // terminal-aware Expiry above would never re-evaluate
+        history.put(taskId, events);
 
         List<SseEmitter> taskEmitters = emitters.get(taskId);
         if (taskEmitters != null) {
